@@ -9,9 +9,9 @@ s=s.replace('<script>','<script src="vendor/supabase.js"></script>\n<script src=
 t='const timer = setTimeout(()=>{ $("sync").textContent = "Sin conexión a tus datos todavía"; }, 10000);'
 assert t in s; s=s.replace(t, t.replace('{ $("sync")','{ if (!window.MF_PWA) $("sync")'))
 import re
-s=re.sub(r'<div class="dr-av">[^<]*</div><div><b>[^<]*</b>','<div class="dr-av">💳</div><div><b>Mis finanzas</b>',s,count=1)
+s=re.sub(r'<div class="dr-av">[^<]*</div><div><b>[^<]*</b>','<div class="dr-av"><img src="icon-192.png" alt="" style="width:100%;height:100%;border-radius:inherit"></div><div><b>Mis finanzas</b>',s,count=1)
 open(os.path.join(ROOT,'index.html'),'w').write(s)
-for f in ['shim.js','manifest.webmanifest','icon-192.png','icon-512.png']: shutil.copy(os.path.join(HERE,f), os.path.join(ROOT,f))
+for f in ['shim.js','manifest.webmanifest','icon-192.png','icon-512.png','icon-maskable.png','apple-touch-icon.png']: shutil.copy(os.path.join(HERE,f), os.path.join(ROOT,f))
 os.makedirs(os.path.join(ROOT,'vendor'),exist_ok=True); shutil.copy(os.path.join(HERE,'vendor','supabase.js'), os.path.join(ROOT,'vendor','supabase.js'))
 open(os.path.join(ROOT,'sw.js'),'w').write(open(os.path.join(HERE,'sw.js')).read().replace('__VER__', time.strftime('%Y%m%d%H%M%S')))
 open(os.path.join(ROOT,'.nojekyll'),'w').write('')
