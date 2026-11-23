@@ -170,7 +170,8 @@ function catalogHTML(q, sel){
   q = (q||"").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
   if (q){ const terms = [q, ...Object.entries(TI_ES).filter(([k])=>k.startsWith(q)||q.startsWith(k)).flatMap(([,v])=>v.split(" "))];
     const all = tiAll().length ? tiAll() : Object.values(TI_CATALOGO).flat();
-    const res = all.filter(n=>terms.some(t=>n.includes(t))).slice(0,120);
+    const score = n => Math.min(...terms.map(t=>{ const seg = n.split("-"); return n===t?0 : seg[0]===t?1 : seg.includes(t)?2 : n.includes(t)?4 : 9; })) + (/^(brand|currency)-/.test(n)?3:0);
+    const res = all.map(n=>[n,score(n)]).filter(([,v])=>v<9).sort((x,y)=>x[1]-y[1]||x[0].length-y[0].length).map(([n])=>n).slice(0,120);
     return res.length ? `<div class="cg-grid">${res.map(btn).join("")}</div>` : `<p class="sub">Sin resultados. Prueba otra palabra.</p>`; }
   return Object.entries(TI_CATALOGO).map(([sec, l])=>`<div class="cg-sec">${esc(sec)}</div><div class="cg-grid">${l.map(btn).join("")}</div>`).join("");
 }

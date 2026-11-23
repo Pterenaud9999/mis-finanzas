@@ -1,4 +1,4 @@
-const CACHE = "mf-20261123172832";
+const CACHE = "mf-20261123173710";
 const SHELL = ["./", "index.html", "shim.js", "vendor/supabase.js", "manifest.webmanifest", "vendor/tabler/tabler-icons-300.min.css", "vendor/roboto/roboto-latin-400-normal.woff2", "vendor/roboto/roboto-latin-500-normal.woff2", "vendor/roboto/roboto-latin-700-normal.woff2", "icon-192.png", "icon-512.png", "icon-maskable.png", "apple-touch-icon.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });

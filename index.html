@@ -1639,7 +1639,8 @@ function catalogHTML(q, sel){
   q = (q||"").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
   if (q){ const terms = [q, ...Object.entries(TI_ES).filter(([k])=>k.startsWith(q)||q.startsWith(k)).flatMap(([,v])=>v.split(" "))];
     const all = tiAll().length ? tiAll() : Object.values(TI_CATALOGO).flat();
-    const res = all.filter(n=>terms.some(t=>n.includes(t))).slice(0,120);
+    const score = n => Math.min(...terms.map(t=>{ const seg = n.split("-"); return n===t?0 : seg[0]===t?1 : seg.includes(t)?2 : n.includes(t)?4 : 9; })) + (/^(brand|currency)-/.test(n)?3:0);
+    const res = all.map(n=>[n,score(n)]).filter(([,v])=>v<9).sort((x,y)=>x[1]-y[1]||x[0].length-y[0].length).map(([n])=>n).slice(0,120);
     return res.length ? `<div class="cg-grid">${res.map(btn).join("")}</div>` : `<p class="sub">Sin resultados. Prueba otra palabra.</p>`; }
   return Object.entries(TI_CATALOGO).map(([sec, l])=>`<div class="cg-sec">${esc(sec)}</div><div class="cg-grid">${l.map(btn).join("")}</div>`).join("");
 }
@@ -1922,8 +1923,15 @@ function renderTx(){
   h += `<div class="tx-sec"><span class="sub">Categorías${x.cat?"":' · <span style="color:var(--bad)">Tiene que seleccionar la categoría</span>'}</span></div>`;
   if (S.txMore){
     const q = (S.txQ||"").toLowerCase();
-    h += `<input id="tx-q" type="search" placeholder="Buscar categoría" value="${esc(S.txQ||"")}" class="tx-in" aria-label="Buscar categoría"><div class="cat-grid">${catList(x.t).filter(c=>!q||c.toLowerCase().includes(q)).map(catBtn).join("")}</div>`;
+    h += `<input id="tx-q" type="search" placeholder="Buscar categoría" value="${esc(S.txQ||"")}" class="tx-in" aria-label="Buscar categoría"><div class="cat-grid">${catList(x.t).filter(c=>!q||c.toLowerCase().includes(q)).map(catBtn).join("")}<button type="button" class="cat-cell" data-act="txnewcat"><span class="cat-ic" style="background:#f8c11c;color:#15171c"><i class="ti ti-plus" aria-hidden="true"></i></span><span class="cat-n">Crear</span></button></div>`;
   } else h += `<div class="cat-grid">${freq.slice(0,7).map(catBtn).join("")}<button type="button" class="cat-cell" data-act="txmore"><span class="cat-ic" style="background:var(--muted)">+</span><span class="cat-n">Más</span></button></div>`;
+  if (S.txNewCat){ const n = S.txNewCat;
+    h += `<div class="panel tx-det"><b>Nueva categoría de ${x.t==="g"?"gastos":"ingresos"}</b>
+      <label for="txnc-n"><span class="sub">Nombre</span><input id="txnc-n" class="tx-in" maxlength="40" value="${esc(n.n||"")}" placeholder="Ej. Mascotas"></label>
+      <div class="cg-prev"><span class="cat-ic big" style="background:${esc(n.c)}">${icHTML(n.e,"?")}</span><div class="cg-pal">${CG_PAL.map(c=>`<button type="button" class="cg-sw${n.c===c?" on":""}" style="background:${c}" data-act="txnccol" data-v="${c}" aria-label="Color ${c}"></button>`).join("")}</div></div>
+      <label for="txnc-q"><span class="sub">Catálogo de íconos</span><input id="txnc-q" class="tx-in" type="search" placeholder="Buscar (comida, carro, dinero…)" value="${esc(S.txNcQ||"")}"></label>
+      ${catalogHTML(S.txNcQ, n.e).replace(/data-act="catico"/g,'data-act="txncico"')}
+      <div class="actions"><button type="button" class="btn sm primary" data-act="txncsave">Crear y usar</button><button type="button" class="btn sm" data-act="txnccancel">Cancelar</button></div></div>`; }
   h += detHTML(x);
   h += `<div class="tx-dates">${[[todayISO,"hoy"],[ayer,"ayer"],[antier,"hace dos días"]].map(([d,l])=>`<button type="button" class="tx-chip${x.f===d?" on":""}" data-act="txdate" data-d="${d}"><b>${parseD(d).getDate()}/${parseD(d).getMonth()+1}</b><span>${l}</span></button>`).join("")}
       <label class="tx-chip${[todayISO,ayer,antier].includes(x.f)?"":" on"}" for="tx-f">📅<input id="tx-f" type="date" value="${esc(x.f)}" aria-label="Otra fecha"></label></div>
@@ -2278,7 +2286,7 @@ document.addEventListener("click", async e=>{
     }
     return;
   }
-  const mine = ["txclose","txdiscard","txkeep","txtxt","txparse","txocr","txt","txop","txcta","txctasel","txtdcsel","txcat","txmore","txdate","txtagdel","txpago","txfotodel","txscan","txmanual","tkdel","tkflag","tknewadd","tknewotro","txsave","txcopy","txdel","txdetchip","txusesum","txcuotas","txcuotasreset","madd","medit","despprev","despnext","despopen","desprng"];
+  const mine = ["txclose","txdiscard","txkeep","txnewcat","txncico","txnccol","txncsave","txnccancel","txtxt","txparse","txocr","txt","txop","txcta","txctasel","txtdcsel","txcat","txmore","txdate","txtagdel","txpago","txfotodel","txscan","txmanual","tkdel","tkflag","tknewadd","tknewotro","txsave","txcopy","txdel","txdetchip","txusesum","txcuotas","txcuotasreset","madd","medit","despprev","despnext","despopen","desprng"];
   if (!mine.includes(act)) return;
   e.stopImmediatePropagation();
   if (act==="madd"){ openTx(null); if (S.mvMode==="dia" && S.mvDate) { S.tx.f = S.mvDate; renderTx(); } return; }
@@ -2307,6 +2315,16 @@ document.addEventListener("click", async e=>{
     case "txusesum": x.expr = String(a.dataset.v); renderTx(); return;
     case "txfotodel": x.fotos.splice(+a.dataset.i,1); renderTx(); return;
     case "txscan": await scanTicket(); return;
+    case "txnewcat": S.txNewCat = {n:"", e:"ti-tag", c:"#4d8cf0"}; S.txNcQ = ""; renderTx(); $("txnc-n")?.focus(); return;
+    case "txncico": S.txNewCat.n = $("txnc-n")?.value ?? S.txNewCat.n; S.txNewCat.e = a.dataset.v; renderTx(); return;
+    case "txnccol": S.txNewCat.n = $("txnc-n")?.value ?? S.txNewCat.n; S.txNewCat.c = a.dataset.v; renderTx(); return;
+    case "txnccancel": S.txNewCat = null; renderTx(); return;
+    case "txncsave": { const n = ($("txnc-n")?.value||"").trim(); if (!n){ S.txMsg = "Escribe el nombre de la categoría."; renderTx(); return; }
+      const t = x.t, cfg = JSON.parse(JSON.stringify(S.catCfg||{g:{},i:{},nuevas:{g:[],i:[]}}));
+      cfg[t] = cfg[t]||{}; cfg[t][n] = [S.txNewCat.e, S.txNewCat.c]; cfg.nuevas = cfg.nuevas||{g:[],i:[]}; cfg.nuevas[t] = cfg.nuevas[t]||[];
+      if (!catList(t).includes(n)) cfg.nuevas[t].push(n);
+      S.catCfg = cfg; if (db) await save(()=>db.doc("config/cats").set(cfg));
+      x.cat = n; S.txNewCat = null; S.txMore = false; S.txMsg = ""; renderTx(); return; }
     case "txocr": {
       if (S.txOcr || !window.MF_OCR) return; S.txOcr = true; S.txMsg = "Preparando el lector… (la primera vez descarga unos 10 MB)"; renderTx();
       try {
@@ -2380,6 +2398,7 @@ document.addEventListener("input", e=>{
   if (e.target.id==="tx-expr"){ const v = evalAmount(e.target.value); const r = $("tx-res"); S.tx.expr = e.target.value;
     if (r) r.textContent = /[+\-*/()×÷−]/.test(e.target.value.slice(1)) ? (Number.isFinite(v)?"= "+fmt(v):"Operación incompleta") : "";
     const b = document.querySelector(".tx-save"); if (b) b.disabled = !txValid(S.tx); }
+  if (e.target.id==="txnc-q"){ S.txNcQ = e.target.value; if (S.txNewCat) S.txNewCat.n = $("txnc-n")?.value ?? S.txNewCat.n; clearTimeout(S._tnq); S._tnq=setTimeout(()=>{ renderTx(); const q=$("txnc-q"); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length);} },250); }
   if (e.target.id==="tx-q"){ S.txQ = e.target.value; clearTimeout(S._tq); S._tq=setTimeout(()=>{ readTx(); renderTx(); const q=$("tx-q"); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length);} },200); }
 });
 document.addEventListener("change", async e=>{
