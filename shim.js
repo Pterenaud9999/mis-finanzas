@@ -111,6 +111,11 @@
       if (b) showFoto(id, URL.createObjectURL(b));
     } finally { fotoLoading.delete(id); }
   }
+  window.MF_fotoBlob = async id => { let b = await idb.get("fotos", id).catch(()=>null);
+    if (!b && L.user){ const { data } = await sb.storage.from("fotos").download(L.user.id + "/" + id); b = data || null; } if (!b) throw new Error("sin foto"); return b; };
+  window.MF_deleteFoto = async id => { idb.del("fotos", id).catch(()=>{}); const i = fotoQueue.indexOf(id); if (i>=0) fotoQueue.splice(i,1);
+    const u = fotoURL.get(id); if (u){ URL.revokeObjectURL(u); fotoURL.delete(id); }
+    if (L.user && navigator.onLine) await sb.storage.from("fotos").remove([L.user.id + "/" + id]).catch(()=>{}); };
   window.MF_fotoSrc = id => { if (fotoURL.has(id)) return fotoURL.get(id); loadFoto(id); return BLANK; };
   async function shrink(file){ // reduce fotos a ~1600 px JPEG
     try { const bmp = await createImageBitmap(file); const k = Math.min(1, 1600/Math.max(bmp.width, bmp.height));
