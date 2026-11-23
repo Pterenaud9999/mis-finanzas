@@ -2423,7 +2423,7 @@ function updAb(){ const b=$("ab-total"); if (!b) return; const t=cuentasTotals()
 /* ---------- Datos ---------- */
 render();
 (async ()=>{
-  const timer = setTimeout(()=>{ $("sync").textContent = "Sin conexión a tus datos todavía"; }, 10000);
+  const timer = setTimeout(()=>{ if (!window.MF_PWA) $("sync").textContent = "Sin conexión a tus datos todavía"; }, 10000);
   try { db = await (window.claude && window.claude.use ? window.claude.use("db") : null); } catch(e){ db = null; }
   if (!db){ clearTimeout(timer); $("sync").textContent = "Abre la página con tu cuenta para ver tus datos"; return; }
   const got = new Set();

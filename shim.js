@@ -74,7 +74,8 @@
       setStatus("Al día · " + new Date().toLocaleTimeString("es-MX", { hour:"2-digit", minute:"2-digit" }));
     } catch(e){
       console.warn("sync", e);
-      setStatus(navigator.onLine ? "No se pudo sincronizar; se reintentará" : "Sin conexión · cambios guardados en este dispositivo");
+      setStatus(navigator.onLine ? "No se pudo sincronizar: " + (e?.message || e?.code || e) + " (se reintentará)" : "Sin conexión · cambios guardados en este dispositivo");
+      window.MF_lastError = e;
     } finally { syncing = false; if (pendingSync){ pendingSync = false; scheduleSync(300); } }
   }
   window.addEventListener("online", ()=>scheduleSync(200));
