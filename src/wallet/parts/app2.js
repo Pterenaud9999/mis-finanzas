@@ -1,8 +1,12 @@
 /* ================= Tema blanco / negro ================= */
 function applyTheme(t){
-  document.documentElement.classList.toggle("th-light", t==="light");
-  document.documentElement.classList.toggle("th-dark", t==="dark");
-  const b = $("theme-btn"); if (b){ b.setAttribute("aria-label", t==="dark"?"Cambiar a fondo blanco":"Cambiar a fondo negro"); b.textContent = t==="dark" ? "☀" : "☾"; }
+  const r = document.documentElement;
+  r.classList.toggle("th-light", t==="light");
+  r.classList.toggle("th-dark", t==="dark" || t==="verde");
+  r.classList.toggle("th-green", t==="verde");
+  const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = t==="verde" ? "#1c3a2c" : t==="dark" ? "#0f1115" : "#0f7b6c";
+  const nx = {light:"verde", verde:"dark", dark:"light"}[t] || "verde";
+  const b = $("theme-btn"); if (b){ b.setAttribute("aria-label", nx==="verde"?"Cambiar a fondo oscuro verde":nx==="dark"?"Cambiar a fondo negro":"Cambiar a fondo blanco"); b.innerHTML = nx==="light" ? "☀" : nx==="verde" ? '<i class="ti ti-leaf" aria-hidden="true"></i>' : "☾"; }
 }
 (function(){ let t="light"; try { t = localStorage.getItem("mf-theme") || "light"; } catch(e){} S.theme=t; applyTheme(t); })();
 
@@ -188,7 +192,7 @@ document.addEventListener("click", async e=>{
   switch(act){
     case "drawer": openDrawer(true); return;
     case "drawerclose": openDrawer(false); return;
-    case "theme": { const t = S.theme==="dark"?"light":"dark"; S.theme=t; applyTheme(t); try{ localStorage.setItem("mf-theme",t); }catch(err){} return; }
+    case "theme": { const t = {light:"verde", verde:"dark", dark:"light"}[S.theme] || "verde"; S.theme=t; applyTheme(t); try{ localStorage.setItem("mf-theme",t); }catch(err){} return; }
     case "trfhist": S.trfView=true; S.trfEdit=null; renderCuentas(); return;
     case "trfback": S.trfView=false; S.trfEdit=null; renderCuentas(); return;
     case "trfnew": S.trfConfirm=false; S.trfEdit={nuevo:true,f:todayISO}; renderCuentas(); $("tr-de")?.focus(); return;
