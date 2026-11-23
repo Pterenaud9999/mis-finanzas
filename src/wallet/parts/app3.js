@@ -740,3 +740,12 @@ function renderDespensa(){
   h += items.map(x=>`<button class="mrow" data-act="despopen" data-id="${esc(x.id)}" data-f="${esc(x.f)}"><span class="mcat">${dShort(x.f)}</span><span class="mn">${esc(x.ticket?.tienda||x.n||x.cat)}<span class="sub"> · ${x.ticket?.items?.length?"✓ desglosada":"sin desglose"}</span></span><span class="num">${fmt(x.m)}</span></button>`).join("") || `<p class="empty">Sin compras de despensa en este periodo.</p>`;
   box.innerHTML = h;
 }
+
+/* Borrar un gasto de Inicio por id (y sus ligas en la Wallet) */
+async function delMovById(id){
+  for (const ym of allMonths()){
+    const it = monthItems(ym).find(y=>y.id===id);
+    if (it){ await toTrash({tipo:"mov", ym, data:{...it}}); await removeLinks(it); await writeMonth(ym, monthItems(ym).filter(y=>y.id!==id)); return true; }
+  }
+  return false;
+}

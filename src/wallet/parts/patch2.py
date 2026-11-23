@@ -30,3 +30,38 @@ app=rep(app,'  if (e.key==="Escape" && S.sheet){ S.sheet=false; resetForms(); re
 app=rep(app,'const cname = c => c ? (c.nombre+(c.producto?" "+c.producto:"")) : "";','const cname = c => c ? (c.producto && c.producto.toLowerCase().startsWith(c.nombre.toLowerCase()) ? c.producto : c.nombre+(c.producto?" "+c.producto:"")) : "";')
 app=rep(app,'''<div class="ptab-st">${statusSelect(p,true)}${p.fechaRevisar?'<span class="chipst under">Fecha por revisar</span>':""}''','''<div class="ptab-st">${statusSelect(p,true)}${p.fechaRevisar?'<span class="chipst under">Fecha por revisar</span>':""}${p.fechaEstimada?`<span class="chipst under">Fecha estimada · antes ${dLong(p.dueOriginal)}</span>`:""}''')
 app=rep(app,'update({due, fechaRevisar:false})','update({due, fechaRevisar:false, fechaEstimada:false})')
+# --- Sugerencias al borrar desde la Wallet gastos que también están en Inicio
+app=rep(app,'''  const del = it ? `<button class="btn danger" type="button" data-act="delrow" data-p="${esc(pid)}" data-i="${it.i}">${S.confirmRow===pid+":"+it.i?"Confirmar eliminar":"Eliminar"}</button>` : "";''','''  const conf = it && S.confirmRow===pid+":"+it.i;
+  const del = !it ? "" : (conf && it.movId) ? `<div class="full tx-warn" role="alert">💡 <b>Este gasto también está registrado en Inicio.</b> Si el gasto no existió, elimínalo de los dos lados. Si solo el banco no lo cobró en este periodo, quítalo solo de la Wallet.${/^\\d+\\/\\d+ /.test(it.concepto||"")?" <br>Al quitarlo de Inicio se borra la compra completa con todas sus mensualidades.":""}
+      <div class="actions"><button class="btn sm danger" type="button" data-act="delrow" data-mode="ambos" data-p="${esc(pid)}" data-i="${it.i}">También de Inicio</button><button class="btn sm" type="button" data-act="delrow" data-mode="wallet" data-p="${esc(pid)}" data-i="${it.i}">Solo de la Wallet</button></div></div>`
+    : `<button class="btn danger" type="button" data-act="delrow" data-p="${esc(pid)}" data-i="${it.i}">${conf?"Confirmar eliminar":"Eliminar"}</button>`;''')
+app=rep(app,'''    <button class="btn sm danger" data-act="delper" data-p="${id}">${S.confirmDel===p.id?"Confirmar eliminar":"Eliminar periodo"}</button></div></div>`;''','''    <button class="btn sm danger" data-act="delper" data-p="${id}">${S.confirmDel===p.id?"Confirmar eliminar":"Eliminar periodo"}</button></div>${S.confirmDel===p.id && (p.items||[]).some(i=>i.movId) ? (()=>{ const n = (p.items||[]).filter(i=>i.movId).length;
+      return `<div class="ef tx-warn" role="alert">💡 <b>Este periodo tiene ${n} gasto${n>1?"s":""} registrado${n>1?"s":""} también en Inicio.</b> ¿Qué hago con ${n>1?"ellos":"él"}? Si la fecha estaba mal, muévelos al siguiente periodo.
+      <div class="actions"><button class="btn sm primary" data-act="delper" data-mode="mover" data-p="${id}">Mover al siguiente periodo</button><button class="btn sm danger" data-act="delper" data-mode="ambos" data-p="${id}">Eliminar también de Inicio</button><button class="btn sm" data-act="delper" data-mode="wallet" data-p="${id}">Solo quitar de la Wallet</button><button class="btn sm" data-act="cancel">Cancelar</button></div></div>`; })() : ""}</div>`;''')
+app=rep(app,'''    case "delper":
+      if (S.confirmDel!==pid){ S.confirmDel=pid; break; }
+      if (db){ const {id, ...data} = JSON.parse(JSON.stringify(P)); await save(async()=>{ await toTrash({tipo:"periodo", card:P.card, pid, data}); await db.doc("periods/"+pid).delete(); }); }
+      resetForms(); S.openP=null; break;''','''    case "delper": {
+      if (S.confirmDel!==pid){ S.confirmDel=pid; break; }
+      const linked = (P.items||[]).some(i=>i.movId), mode = a.dataset.mode;
+      if (linked && !mode) break;
+      if (db){ const {id, ...data} = JSON.parse(JSON.stringify(P)); await save(async()=>{
+        if (mode==="mover"){
+          const next = S.periods.filter(q=>q.card===P.card && q.id!==P.id && q.due>P.due).sort((x,y)=>x.due.localeCompare(y.due))[0];
+          const moved = (P.items||[]).map(i=>({...i}));
+          if (next) await db.doc("periods/"+next.id).update({items:[...(next.items||[]).map(i=>({...i})), ...moved]});
+          else { const due = addMonthsISO(P.due, 1); await db.doc("periods/"+P.card+"-"+due).set({card:P.card, due, status:"abierto", items:moved, auto:true}); }
+          await toTrash({tipo:"periodo", card:P.card, pid, data:{...data, items:[]}});
+        } else {
+          if (mode==="ambos") for (const mid of [...new Set((P.items||[]).filter(i=>i.movId).map(i=>i.movId))]) await delMovById(mid);
+          await toTrash({tipo:"periodo", card:P.card, pid, data});
+        }
+        await db.doc("periods/"+pid).delete(); }); }
+      resetForms(); S.openP=null; break; }''')
+app=rep(app,'''    case "delrow": {
+      const key = pid+":"+idx;
+      if (S.confirmRow!==key){ S.confirmRow=key; break; }''','''    case "delrow": {
+      const key = pid+":"+idx;
+      if (S.confirmRow!==key){ S.confirmRow=key; break; }
+      if (P.items[idx]?.movId){ if (!a.dataset.mode) break;
+        if (a.dataset.mode==="ambos"){ if (db) await save(()=>delMovById(P.items[idx].movId)); resetForms(); break; } }''')
