@@ -386,6 +386,7 @@ html:root.th-dark{--bg:#0f1115; --surface:#181b21; --ink:#eef0f4; --muted:#9aa1a
 .tk-row input[type=checkbox]{margin-top:8px;width:18px;height:18px}
 .tk-main{display:flex;flex-direction:column;gap:3px;min-width:0}
 .tk-main>input,.tk-m,.tk-ctl input,.tk-ctl select{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;padding:5px 7px;font:inherit;font-size:13px;min-width:0}
+.tk-rev{font-size:11px;color:var(--warn)}
 .tk-raw{font-size:11px;font-family:ui-monospace,monospace}
 .tk-ctl{grid-column:2/-1;display:flex;gap:4px;flex-wrap:wrap;align-items:center}
 .tk .tk-ctl input{flex:0 0 74px;width:74px;text-align:right}.tk .tk-ctl select{flex:1 1 130px;min-width:0;width:auto}.tk .tk-ctl select.tk-u{flex:0 0 58px;width:58px}
@@ -1874,9 +1875,9 @@ function renderTx(){
     ${assetsNS && (x.fotos||[]).length<3 ? `<div class="tx-paste" contenteditable="true" role="textbox" aria-label="Pegar imagen del ticket" data-paste>📋 Pegar imagen: <b>Ctrl+V</b> en PC, o mantén presionado aquí → <b>Pegar</b> en el celular</div>`:""}`;
   if (x.t==="g"){
     const isSuper = DESP_CATS.includes(x.cat) || x.ticket;
-    h += `<div class="actions">${(x.fotos||[]).length && sampleNS && sampleImg ? `<button type="button" class="btn sm primary" data-act="txscan">📷 Leer ticket</button>`:""}${isSuper||!DET[x.cat]?`<button type="button" class="btn sm" data-act="txtxt">📋 Pegar texto del ticket</button><button type="button" class="btn sm" data-act="txmanual">${x.ticket?"+ Agregar producto":"Desglosar a mano"}</button>`:""}</div>`;
+    h += `<div class="actions">${(x.fotos||[]).length && sampleNS && sampleImg ? `<button type="button" class="btn sm primary" data-act="txscan">📷 Leer ticket</button>`:""}${(x.fotos||[]).length && window.MF_OCR && !(sampleNS && sampleImg) ? `<button type="button" class="btn sm primary" data-act="txocr" ${S.txOcr?"disabled":""}>🔍 Leer foto</button>`:""}${isSuper||!DET[x.cat]?`<button type="button" class="btn sm" data-act="txtxt">📋 Pegar texto del ticket</button><button type="button" class="btn sm" data-act="txmanual">${x.ticket?"+ Agregar producto":"Desglosar a mano"}</button>`:""}</div>`;
     if (S.txTxt) h += `<div class="panel tx-det"><label for="tx-tktxt"><span class="sub">Copia el texto del ticket (AI Lens, Google Lens o Texto en vivo) y pégalo aquí</span></label>
-      <textarea id="tx-tktxt" class="tx-in" rows="7" placeholder="2.000 Clara Hue Liq San 46.50 93.00 A&#10;0.440 Pepino Verde Kg 29.90 13.16 A&#10;…"></textarea>
+      <textarea id="tx-tktxt" class="tx-in" rows="7" placeholder="2.000 Clara Hue Liq San 46.50 93.00 A&#10;0.440 Pepino Verde Kg 29.90 13.16 A&#10;…">${esc(S.txTxtVal||"")}</textarea>
       <div class="actions"><button type="button" class="btn sm primary" data-act="txparse">Separar productos</button><button type="button" class="btn sm" data-act="txtxt">Cancelar</button></div></div>`;
     if (S.txMsg) h += `<p class="sub" style="margin:0">${S.txMsg}</p>`;
     if (x.ticket) h += ticketHTML(x.ticket, mxn);
@@ -1922,7 +1923,7 @@ function ticketHTML(tk, total){
     if (nuevo) h += `<div class="tk-new">🆕 Nuevo tipo detectado: <b>${esc(k.slice(6))}</b> <button type="button" class="btn sm primary" data-act="tknewadd" data-k="${esc(k)}">Agregar tipo</button><button type="button" class="btn sm" data-act="tknewotro" data-k="${esc(k)}">Usar “Otro”</button></div>`;
     g.forEach(it=>{ const i = it.i;
       h += `<div class="tk-row${it.ok?"":" pend"}"><input type="checkbox" data-tk="${i}" data-k="ok" aria-label="Confirmar producto" ${it.ok?"checked":""}>
-        <div class="tk-main"><input id="tk-p-${i}" aria-label="Producto" data-tk="${i}" data-k="p" value="${esc(it.p)}" placeholder="Producto">${it.raw?`<span class="sub tk-raw">${esc(it.raw)}</span>`:""}</div>
+        <div class="tk-main"><input id="tk-p-${i}" aria-label="Producto" data-tk="${i}" data-k="p" value="${esc(it.p)}" placeholder="Producto">${it.raw?`<span class="sub tk-raw">${esc(it.raw)}</span>`:""}${it.rev?`<span class="tk-rev">⚠️ revisa cantidad y monto (precio leído ${fmt(it.precio||0)})</span>`:""}</div>
         <input id="tk-m-${i}" class="tk-m" aria-label="Monto" type="number" step="0.01" data-tk="${i}" data-k="m" value="${it.m}">
         <button type="button" class="iconbtn" data-act="tkdel" data-i="${i}" aria-label="Quitar producto">×</button>
           <div class="tk-ctl"><input id="tk-q-${i}" aria-label="Cantidad" data-tk="${i}" data-k="q" type="number" step="0.001" inputmode="decimal" value="${esc(it.q??"")}" placeholder="Cant."><select id="tk-u-${i}" aria-label="Unidad" data-tk="${i}" data-k="u" class="tk-u">${UNIDADES.map(u=>`<option${(it.u||"pz")===u?" selected":""}>${u}</option>`).join("")}</select><select id="tk-c-${i}" aria-label="Tipo" data-tk="${i}" data-k="c">${tkList().map(([kk,l])=>`<option value="${kk}"${it.c===kk?" selected":""}>${esc(l)}</option>`).join("")}${nuevo?`<option value="${esc(k)}" selected>${esc(k.slice(6))} (nuevo)</option>`:""}</select>
@@ -2006,29 +2007,31 @@ const TK_KW = [[/pepino|zanahori|jitomat|tomate|cebolla|lechuga|brocol|calabaz|p
   [/papel|servilleta|bolsa|foco|pila|aluminio|encendedor/i,"hog"],
   [/shampoo|champu|pasta dental|colgate|desodorante|rastrillo|toalla femen|crema corporal|cepillo/i,"hig"]];
 function parseTicketText(txt){
-  const num = s => parseFloat(String(s).replace(/\s/g,"").replace(/,(\d{2})$/,".$1").replace(/,/g,""));
-  const lines = String(txt).split(/\r?\n/).map(l=>l.replace(/[|]/g," ").replace(/\s+/g," ").trim()).filter(Boolean);
+  const num = s => { s = String(s).trim().replace(/\s(\d{2})$/,".$1").replace(/,(\d{2})$/,".$1").replace(/,/g,""); return parseFloat(s); };
+  const lines = String(txt).split(/\r?\n/).map(l=>l.replace(/[|«»“”"'£€¡¿~^`]/g," ").replace(/\s+/g," ").trim()).filter(Boolean);
   let tienda = null, total = null, desc = null, tipo = null; const items = [];
   const T = ["Chedraui","Soriana","Walmart","Bodega Aurrera","Sam's Club","Costco","Super Aki","City Market","Oxxo","La Comer","HEB","Mega"];
-  for (const l of lines.slice(0,8)){ const t = T.find(t=>l.toLowerCase().includes(t.toLowerCase().replace("'",""))||l.toLowerCase().includes(t.toLowerCase())); if (t){ tienda = t; break; } }
+  for (const l of lines.slice(0,8)){ const t = T.find(t=>l.toLowerCase().replace(/[^a-z]/g,"").includes(t.toLowerCase().replace(/[^a-z]/g,""))); if (t){ tienda = t; break; } }
+  const AMT = String.raw`(\d{1,5}(?:[.,]\d{2}|\s\d{2}))\d?`;
   for (const l of lines){
     const L = l.toUpperCase();
-    if (/^(\*+\s*)?TOTAL\b|TOTAL M\.?N|^TOTAL\s/.test(L) || /\*\*\s*\*\*\s*TOTAL/.test(L)){ const m = l.match(/(\d[\d,]*[.,]\d{2})\s*$/); if (m && total==null) total = num(m[1]); break; }
-    if (/R\.?F\.?C|SUCURSAL|C\.?P\.|CANT\.?\s*ART|PRECIO|TARJETA|AFILIACI|CAMBIO|IVA|SUBTOTAL|FOLIO|OPERADOR/.test(L)) continue;
+    if (/TOTAL/.test(L) && !/SUBTOTAL|ARTICULOS|ARTÍCULOS|PRECIO|RTICULO/.test(L)){ const m = l.match(/(\d[\d,]*[.,]\d{2})\s*\S?\s*$/); if (m){ if (total==null) total = num(m[1]); break; } continue; }
+    if (/R\.?F\.?C|RFC|SUCURSAL|C\.?P\.|RTICULO|PRECIO|TARJETA|AFILIACI|CAMBIO|\bIVA\b|FOLIO|OPERADOR|CONSTITUYENTES/.test(L)) continue;
     if (/DESCUENTO|AHORRO|MONEDERO|PUNTOS|BONIFIC/.test(L)){ const m = l.match(/(\d[\d,]*[.,]\d{2})/); if (m) desc = (desc||0) + num(m[1]); continue; }
-    let m = l.match(/^(\d+(?:[.,]\d{1,3})?)\s+\*?\s*(.+?)\s+(\d[\d,]*[.,]\d{2})\s+(\d[\d,]*[.,]\d{2})\s*[A-Z]?$/);
-    let q=null, p=null, m_=null;
-    if (m){ q = num(m[1]); p = m[2]; m_ = num(m[4]); }
-    else if ((m = l.match(/^(\d+(?:[.,]\d{1,3})?)\s+\*?\s*(.+?)\s+(\d[\d,]*[.,]\d{2})\s*[A-Z]?$/)) && /[a-z]/i.test(m[2])){ q = num(m[1]); p = m[2]; m_ = num(m[3]); }
-    else if ((m = l.match(/^([A-Za-zÁÉÍÓÚÑáéíóúñ].{2,}?)\s+(\d[\d,]*[.,]\d{2})\s*[A-Z]?$/)) && !/TOTAL/.test(L)){ p = m[1]; m_ = num(m[2]); }
-    else if (/^[A-Za-zÁÉÍÓÚÑáéíóúñ ,y]+$/.test(l) && l.length<40){ const h = TK_HEAD.find(([re])=>re.test(l)); if (h) tipo = h[1]; continue; }
-    if (p && Number.isFinite(m_) && m_>0){
-      const raw = p.replace(/^\*\s*/,"").trim();
-      const kw = TK_KW.find(([re])=>re.test(raw));
-      const c = kw ? kw[1] : (tipo||"otro");
-      const u = /\bKG\b|granel/i.test(raw) || (q && q%1) ? "kg" : "pz";
-      items.push({raw:raw.slice(0,60), p:raw.replace(/\b(KG|Kg|kg)\b/,"").trim().slice(0,80), q:q||1, u, m:r2(m_), c, d:["fv","prot","lac"].includes(c), inn:c==="snk", imp:false});
-    }
+    let pre=null, price=null, tot=null, m;
+    if ((m = l.match(new RegExp(String.raw`^(.*?[A-Za-zÁÉÍÓÚÑáéíóúñ].*?)\s+(\d{1,4}[.,]\d{2})\s+` + AMT + String.raw`\s*[A-Z0-9]?\s*$`)))){ pre = m[1]; price = num(m[2]); tot = num(m[3]); }
+    else if ((m = l.match(new RegExp(String.raw`^(.*?[A-Za-zÁÉÍÓÚÑáéíóúñ]{3}.*?)\s+` + AMT + String.raw`\s*[A-Z]?\s*$`)))){ pre = m[1]; tot = num(m[2]); }
+    else if (/^[A-Za-zÁÉÍÓÚÑáéíóúñ ,y]+$/.test(l) && l.length<45){ const h = TK_HEAD.find(([re])=>re.test(l)); if (h) tipo = h[1]; continue; }
+    if (!pre || !Number.isFinite(tot) || tot<=0) continue;
+    let q = null, d = pre; const qm = pre.match(/^(\S+)\s+(.*)$/);
+    if (qm){ const qv = parseFloat(qm[1].replace(",",".")); if (/^\d{1,3}([.,]\d{1,3})?$/.test(qm[1]) && qv>0 && qv<100){ q = qv; d = qm[2]; } else if (!/[A-Za-z]{3}/.test(qm[1])) d = qm[2]; }
+    d = d.replace(/^[^A-Za-zÁÉÍÓÚÑáéíóúñ]+/,"").trim(); if (d.replace(/[^A-Za-z]/g,"").length < 3) continue;
+    let rev = false;
+    if (price){ if (q==null){ q = Math.round(tot/price*1000)/1000; rev = true; }
+      if (Math.abs(q*price - tot) > Math.max(0.6, tot*0.03)) rev = true; }
+    const kw = TK_KW.find(([re])=>re.test(d)), c = kw ? kw[1] : (tipo||"otro");
+    const u = /\bK[GA]\b|granel/i.test(d) || (q && q%1) ? "kg" : "pz";
+    items.push({raw:d.slice(0,60), p:d.replace(/\b(KG|Kg|kg|Ka|ka)\b/,"").trim().slice(0,80), q:q||1, u, m:r2(tot), c, d:["fv","prot","lac"].includes(c), inn:c==="snk", imp:false, rev, precio:price||null});
   }
   return {tienda, total, desc: desc?r2(desc):null, items};
 }
@@ -2077,7 +2080,7 @@ function txItem(){
   const D = DET[x.cat];
   if (D && x.t==="g"){ const det = {}; D.f.forEach(f=>{ if (f.show && !f.show(x.det||{})) return; const v = (x.det||{})[f.k]; if (v!=null && v!=="") det[f.k] = f.ty==="num" ? +v : String(v).trim(); }); if (Object.keys(det).length) it.det = det; }
   if ((x.fotos||[]).length) it.fotos = x.fotos.slice();
-  if (x.t==="g" && x.ticket?.items?.length) it.ticket = {tienda:(x.ticket.tienda||"").trim()||null, desc:+x.ticket.desc||null, items:x.ticket.items.map(i=>({raw:i.raw||null, p:i.p, q:i.q??null, u:i.u||"pz", m:+i.m||0, c:i.c, ok:!!i.ok, d:!!i.d, imp:!!i.imp, inn:!!i.inn}))};
+  if (x.t==="g" && x.ticket?.items?.length) it.ticket = {tienda:(x.ticket.tienda||"").trim()||null, desc:+x.ticket.desc||null, items:x.ticket.items.map(i=>({raw:i.raw||null, p:i.p,  q:i.q??null, u:i.u||"pz", m:+i.m||0, c:i.c, ok:!!i.ok, d:!!i.d, imp:!!i.imp, inn:!!i.inn}))};
   return it;
 }
 async function learnProducts(it){
@@ -2214,7 +2217,7 @@ document.addEventListener("click", async e=>{
     }
     return;
   }
-  const mine = ["txclose","txdiscard","txkeep","txtxt","txparse","txt","txop","txcta","txctasel","txtdcsel","txcat","txmore","txdate","txtagdel","txpago","txfotodel","txscan","txmanual","tkdel","tkflag","tknewadd","tknewotro","txsave","txcopy","txdel","txdetchip","txusesum","txcuotas","txcuotasreset","madd","medit","despprev","despnext","despopen","desprng"];
+  const mine = ["txclose","txdiscard","txkeep","txtxt","txparse","txocr","txt","txop","txcta","txctasel","txtdcsel","txcat","txmore","txdate","txtagdel","txpago","txfotodel","txscan","txmanual","tkdel","tkflag","tknewadd","tknewotro","txsave","txcopy","txdel","txdetchip","txusesum","txcuotas","txcuotasreset","madd","medit","despprev","despnext","despopen","desprng"];
   if (!mine.includes(act)) return;
   e.stopImmediatePropagation();
   if (act==="madd"){ openTx(null); if (S.mvMode==="dia" && S.mvDate) { S.tx.f = S.mvDate; renderTx(); } return; }
@@ -2243,6 +2246,21 @@ document.addEventListener("click", async e=>{
     case "txusesum": x.expr = String(a.dataset.v); renderTx(); return;
     case "txfotodel": x.fotos.splice(+a.dataset.i,1); renderTx(); return;
     case "txscan": await scanTicket(); return;
+    case "txocr": {
+      if (S.txOcr || !window.MF_OCR) return; S.txOcr = true; S.txMsg = "Preparando el lector… (la primera vez descarga unos 10 MB)"; renderTx();
+      try {
+        const id = x.fotos[x.fotos.length-1], blob = window.MF_fotoBlob ? await window.MF_fotoBlob(id) : await fetch(fotoSrc(id)).then(r=>r.blob());
+        let last = -1; const txt = await window.MF_OCR(blob, p=>{ const v = Math.round(p*10); if (v!==last){ last = v; S.txMsg = `Leyendo la foto… ${v*10} %`; renderTx(); } });
+        S.txOcr = false; S.txTxtVal = txt; readTx();
+        const r = parseTicketText(txt);
+        if (r.items.length){
+          x.ticket = {tienda: r.tienda || x.ticket?.tienda || null, desc: r.desc || null, items: catalogMatch(r.items)};
+          if (!x.expr && r.total) x.expr = String(r.total);
+          const known = x.ticket.items.filter(i=>i.ok).length, suma = r2(r.items.reduce((a,i)=>a+i.m,0) - (r.desc||0));
+          S.txMsg = `Leí ${r.items.length} productos${known?` (${known} ya conocidos)`:""}${r.total && Math.abs(suma-r.total)>0.5 ? ` · ⚠️ suman ${fmt(suma)} y el total es ${fmt(r.total)}: revisa montos o usa “Pegar texto” para corregir`:""}. Revisa y palomea.`;
+        } else { S.txTxt = true; S.txMsg = "No pude separar productos. Corrige el texto leído abajo y toca “Separar productos”."; }
+      } catch(e){ S.txOcr = false; S.txMsg = "No se pudo leer la foto: " + (e?.message||e); }
+      renderTx(); return; }
     case "txtxt": S.txTxt = !S.txTxt; renderTx(); if (S.txTxt) $("tx-tktxt")?.focus(); return;
     case "txparse": { const r = parseTicketText($("tx-tktxt")?.value||"");
       if (!r.items.length){ S.txMsg = "No encontré productos en el texto. Revisa que incluya cantidades y precios, o mándame el texto para ajustar la lectura."; renderTx(); return; }

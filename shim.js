@@ -30,8 +30,45 @@
   const notifyAll = () => { notify([...new Set([...Object.keys(L.docs), ...subsDoc.keys(), ...[...subsCol.keys()].map(c=>c+"/")])]); };
 
   /* ---------- Escrituras locales + cola ---------- */
+  /* Combina cambios de dos dispositivos: base = última versión sincronizada */
+  const eq = (a,b) => JSON.stringify(a)===JSON.stringify(b);
+  const isObj = v => v && typeof v==="object" && !Array.isArray(v);
+  function mergeArr(base, loc, srv){
+    base = Array.isArray(base) ? base : [];
+    const hasId = a => a.length && a.every(x=>isObj(x) && x.id!=null);
+    if ((hasId(loc)||!loc.length) && (hasId(srv)||!srv.length) && (hasId(base)||!base.length) && (loc.length||srv.length)){
+      const B = new Map(base.map(x=>[x.id,x])), Lm = new Map(loc.map(x=>[x.id,x])), Sm = new Map(srv.map(x=>[x.id,x])), out = [];
+      const ids = [...new Set([...srv.map(x=>x.id), ...loc.map(x=>x.id)])];
+      ids.forEach(id=>{ const b = B.get(id), l = Lm.get(id), sv = Sm.get(id);
+        if (b && !l && (!sv || eq(sv,b))) return;            // borrado aquí
+        if (b && !sv && (!l || eq(l,b))) return;             // borrado en otro dispositivo
+        if (l && sv) out.push(b ? merge3(b,l,sv) : l); else out.push(l || sv); });
+      return out;
+    }
+    const key = x => JSON.stringify(x), cnt = a => { const m = new Map(); a.forEach(x=>{ const k = key(x); m.set(k,(m.get(k)||0)+1); }); return m; };
+    const cb = cnt(base), cs = cnt(srv), cl = cnt(loc), out = [];
+    const removedBySrv = new Map(); cb.forEach((n,k)=>{ const r = n - (cs.get(k)||0); if (r>0) removedBySrv.set(k,r); });
+    loc.forEach(x=>{ const k = key(x), r = removedBySrv.get(k)||0; if (r>0 && (cb.get(k)||0)>0){ removedBySrv.set(k,r-1); return; } out.push(x); });
+    const addedBySrv = new Map(); cs.forEach((n,k)=>{ const a = n - (cb.get(k)||0); if (a>0) addedBySrv.set(k,a); });
+    srv.forEach(x=>{ const k = key(x), a = addedBySrv.get(k)||0; if (a>0 && (cl.get(k)||0) - (cb.get(k)||0) < a){ out.push(x); addedBySrv.set(k,a-1); } });
+    return out;
+  }
+  function merge3(base, loc, srv){
+    if (eq(loc, base)) return srv; if (eq(srv, base) || eq(loc, srv)) return loc;
+    if (Array.isArray(loc) && Array.isArray(srv)) return mergeArr(base, loc, srv);
+    if (isObj(loc) && isObj(srv)){ const b = isObj(base) ? base : {}, o = {};
+      new Set([...Object.keys(loc), ...Object.keys(srv)]).forEach(k=>{
+        const inL = k in loc, inS = k in srv, inB = k in b;
+        if (!inL && inB && (!inS || eq(srv[k], b[k]))) return; if (!inS && inB && (!inL || eq(loc[k], b[k]))) return;
+        if (inL && inS) o[k] = merge3(b[k], loc[k], srv[k]); else o[k] = inL ? loc[k] : srv[k]; });
+      return o; }
+    return loc;
+  }
+  window.MF_merge3 = merge3;
+
   function localWrite(path, data, deleted){
-    L.docs[path] = { data: deleted ? {} : clone(data), deleted: !!deleted, updated_at: L.docs[path]?.updated_at || null, local: true };
+    const prev = L.docs[path];
+    L.docs[path] = { data: deleted ? {} : clone(data), deleted: !!deleted, updated_at: prev?.updated_at || null, base: prev ? (prev.local ? prev.base : clone(prev.data)) : undefined, local: true };
     L.outbox = L.outbox.filter(o=>o.path!==path); L.outbox.push({ path, data: deleted ? {} : clone(data), deleted: !!deleted });
     persist(); notify([path]); scheduleSync(400);
     if (!navigator.onLine) setTimeout(()=>setStatus(`Sin conexión · ${L.outbox.length} cambio${L.outbox.length>1?"s":""} por subir`), 50);
@@ -49,13 +86,18 @@
       // subir
       while (L.outbox.length){
         const batch = L.outbox.slice(0, 200);
-        const rows = batch.map(o=>({ owner: L.user.id, path: o.path, data: o.data, deleted: o.deleted }));
+        const { data: cur, error: e0 } = await sb.from("docs").select("path,data,deleted,updated_at").in("path", batch.map(o=>o.path)); if (e0) throw e0;
+        const srvMap = new Map((cur||[]).map(r=>[r.path, r])), mergedPaths = [];
+        const rows = batch.map(o=>{ const sv = srvMap.get(o.path), loc = L.docs[o.path];
+          if (sv && loc && sv.updated_at !== loc.updated_at && !o.deleted && !sv.deleted){ // otro dispositivo cambió este documento
+            const m = merge3(loc.base, o.data, sv.data); if (!eq(m, o.data)){ o.data = m; loc.data = clone(m); mergedPaths.push(o.path); } }
+          return { owner: L.user.id, path: o.path, data: o.data, deleted: o.deleted }; });
         const { data, error } = await sb.from("docs").upsert(rows, { onConflict: "owner,path" }).select("path,updated_at");
         if (error) throw error;
         const sent = new Set(batch.map(o=>o.path));
         L.outbox = L.outbox.filter(o=>!sent.has(o.path) || !batch.includes(o));
-        (data||[]).forEach(r=>{ if (L.docs[r.path] && !L.outbox.some(o=>o.path===r.path)){ L.docs[r.path].updated_at = r.updated_at; delete L.docs[r.path].local; } });
-        persist();
+        (data||[]).forEach(r=>{ const d = L.docs[r.path]; if (d && !L.outbox.some(o=>o.path===r.path)){ d.updated_at = r.updated_at; delete d.local; d.base = undefined; } });
+        persist(); if (mergedPaths.length) notify(mergedPaths);
       }
       // bajar
       const changed = [];
@@ -136,6 +178,22 @@
       await idb.put("fotos", id, b); showFoto(id, URL.createObjectURL(b));
       fotoQueue.push(id); idb.put("kv","fotoQueue",fotoQueue).catch(()=>{}); pushFotos();
       return { id, url: fotoURL.get(id) }; }
+  };
+
+  /* ---------- Lector de tickets sin internet (Tesseract) ---------- */
+  async function prepOCR(blob){
+    const bmp = await createImageBitmap(blob); const k = Math.max(1, Math.min(2.2, 1800/bmp.width));
+    const cv = document.createElement("canvas"); cv.width = Math.round(bmp.width*k); cv.height = Math.round(bmp.height*k);
+    const g = cv.getContext("2d"); g.filter = "grayscale(1) contrast(1.6) brightness(1.05)"; g.drawImage(bmp, 0, 0, cv.width, cv.height); return cv;
+  }
+  window.MF_OCR = async (blob, prog) => {
+    if (!window.Tesseract) await new Promise((ok,ko)=>{ const sc = document.createElement("script"); sc.src = "ocr/tesseract.min.js"; sc.onload = ok; sc.onerror = () => ko(new Error("No se pudo cargar el lector")); document.head.appendChild(sc); });
+    const base = new URL("ocr/", location.href).href;
+    const w = await window.Tesseract.createWorker("spa", 1, { workerPath: base+"worker.min.js", corePath: base, langPath: base, workerBlobURL: false,
+      logger: m => { if (prog && m.status==="recognizing text") prog(m.progress); } });
+    try { await w.setParameters({ tessedit_pageseg_mode: "6", preserve_interword_spaces: "1" });
+      const { data } = await w.recognize(await prepOCR(blob)); return data.text || ""; }
+    finally { w.terminate(); }
   };
 
   /* ---------- Historial 2022 → (docs hist/*) ---------- */

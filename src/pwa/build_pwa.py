@@ -15,4 +15,5 @@ for f in ['shim.js','manifest.webmanifest','icon-192.png','icon-512.png']: shuti
 os.makedirs(os.path.join(ROOT,'vendor'),exist_ok=True); shutil.copy(os.path.join(HERE,'vendor','supabase.js'), os.path.join(ROOT,'vendor','supabase.js'))
 open(os.path.join(ROOT,'sw.js'),'w').write(open(os.path.join(HERE,'sw.js')).read().replace('__VER__', time.strftime('%Y%m%d%H%M%S')))
 open(os.path.join(ROOT,'.nojekyll'),'w').write('')
+shutil.copytree(os.path.join(HERE,'ocr'), os.path.join(ROOT,'ocr'), dirs_exist_ok=True)
 print('PWA lista en', ROOT)
