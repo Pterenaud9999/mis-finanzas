@@ -30,7 +30,7 @@ function ctaColor(n){
   if (s.includes("PLERK")) return "#e46fb4";
   return "#7a8190";
 }
-function ctaIcon(n){ const s=n.toUpperCase(); return s.startsWith("EFECTIVO")?"💵":s.includes("DEUDA")?"🏦":(s.includes("AHORRO")||s.includes("EMERGENCIA")||s.includes("MAESTR"))?"🐷":s.startsWith("GBM")||s.includes("PPR")?"📈":"💳"; }
+function ctaIcon(n){ const s=n.toUpperCase(); const k = s.startsWith("EFECTIVO")?"cash":s.includes("DEUDA")?"building-bank":(s.includes("AHORRO")||s.includes("EMERGENCIA")||s.includes("MAESTR"))?"pig-money":s.startsWith("GBM")||s.includes("PPR")?"chart-line":s.includes("SALUD")?"heart-rate-monitor":"wallet"; return `<i class="ti ti-${k}" aria-hidden="true"></i>`; }
 function trfItems(){ const out=[]; Object.values(S.trfDb||{}).forEach(d=>(d.items||[]).forEach(x=>out.push(x))); return out; }
 function ctaSaldo(c){
   let s = +c.s||0;
@@ -135,7 +135,7 @@ function renderGraficos(){
     ${T==="general"?`<div class="cal-leg sub"><span><i class="lg" style="background:${COL.I};border:0"></i> ingresos</span><span><i class="lg" style="background:${COL.G};border:0"></i> gastos</span><span><i class="lg" style="background:${COL.ben};border:0"></i> beneficio</span><span><i class="lg" style="background:${COL.per};border:0"></i> pérdida</span></div>`:""}</div>`;
   const label = P==="mes" ? ymLabel(s.k) : P==="semana" ? `Semana del ${dShort(s.from)}` : P==="dia" ? dLong(s.k) : s.k;
   const list = (o,t)=>{ const tot = Object.values(o).reduce((a,v)=>a+v,0); return Object.entries(o).sort((a,b)=>b[1]-a[1]).map(([c,v])=>{ const ic=catIcon(c,t);
-    return `<div class="mv-catw"><div class="mv-cat"><span class="mv-ic" style="background:${catColor(c,t)}">${ic?ic[0]:esc(c[0])}</span><span class="mv-cn">${esc(c)}</span><span class="mv-pc">${Math.round(v/tot*100)} %</span><span class="mv-am num">${fmt(v).replace("$","")} $</span></div></div>`; }).join("") || '<p class="empty">Sin registros.</p>'; };
+    return `<div class="mv-catw"><div class="mv-cat"><span class="mv-ic" style="background:${catColor(c,t)}">${ic?icHTML(ic[0]):esc(c[0])}</span><span class="mv-cn">${esc(c)}</span><span class="mv-pc">${Math.round(v/tot*100)} %</span><span class="mv-am num">${fmt(v).replace("$","")} $</span></div></div>`; }).join("") || '<p class="empty">Sin registros.</p>'; };
   h += `<div class="sec-head"><b>${esc(label)}</b><span class="sub num">Ingresos ${fmt0(s.I)} · Gastos ${fmt0(s.G)}</span></div>`;
   if (T==="general") h += `<b class="sub">Ingresos</b><div class="mv-list">${list(s.i,"i")}</div><b class="sub">Gastos</b><div class="mv-list">${list(s.g,"g")}</div>`;
   else h += `<div class="mv-list">${list(T==="g"?s.g:s.i, T)}</div>`;
@@ -149,13 +149,30 @@ function renderCategorias(){
   const t = S.ctT||"g", cats = catList(t);
   let h = `<div class="mv-tabs" role="tablist"><button role="tab" data-act="ctt" data-v="g" aria-selected="${t==="g"}">Gastos</button><button role="tab" data-act="ctt" data-v="i" aria-selected="${t==="i"}">Ingresos</button></div>`;
   if (S.catEdit) h += `<form class="f mform" data-form="cat"><label class="full" for="cg-n">Nombre<input id="cg-n" required maxlength="40" value="${esc(S.catEdit.n||"")}" ${S.catEdit.nuevo?"":"readonly"}></label>
-    <label for="cg-e">Ícono (emoji)<input id="cg-e" maxlength="8" value="${esc(S.catEdit.e||"")}"></label>
-    <label for="cg-c">Color<input id="cg-c" type="color" value="${esc(S.catEdit.c||"#4d8cf0")}"></label>
+    <div class="full cg-prev"><span class="cat-ic big" style="background:${esc(S.catEdit.c||"#4d8cf0")}">${icHTML(S.catEdit.e, (S.catEdit.n||"?")[0])}</span>
+      <input type="hidden" id="cg-e" value="${esc(S.catEdit.e||"")}"><label for="cg-c">Color<input id="cg-c" type="color" value="${esc(S.catEdit.c||"#4d8cf0")}"></label></div>
+    <div class="full cg-pal">${CG_PAL.map(c=>`<button type="button" class="cg-sw${S.catEdit.c===c?" on":""}" style="background:${c}" data-act="catcol" data-v="${c}" aria-label="Color ${c}"></button>`).join("")}</div>
+    <div class="full cg-cat"><label for="cg-q"><span class="sub">Catálogo de íconos</span><input id="cg-q" type="search" placeholder="Buscar (comida, carro, dinero…)" value="${esc(S.catQ||"")}"></label>${catalogHTML(S.catQ, S.catEdit.e)}</div>
     ${S.catEdit.nuevo?"":`<p class="full sub" style="margin:0">El nombre de una categoría con historial no se cambia aquí para no separar tus registros.</p>`}
     <div class="actions full"><button class="btn primary" type="submit">Guardar</button><button class="btn" type="button" data-act="catcancel">Cancelar</button></div></form>`;
-  h += `<div class="cat-grid">` + cats.map(c=>{ const ic=catIcon(c,t); return `<button class="cat-cell" data-act="catedit" data-c="${esc(c)}"><span class="cat-ic" style="background:${catColor(c,t)}">${ic?ic[0]:esc(c[0])}</span><span class="cat-n">${esc(c)}</span></button>`; }).join("") +
+  h += `<div class="cat-grid">` + cats.map(c=>{ const ic=catIcon(c,t); return `<button class="cat-cell" data-act="catedit" data-c="${esc(c)}"><span class="cat-ic" style="background:${catColor(c,t)}">${ic?icHTML(ic[0]):esc(c[0])}</span><span class="cat-n">${esc(c)}</span></button>`; }).join("") +
     `<button class="cat-cell" data-act="catnew"><span class="cat-ic" style="background:#f8c11c;color:#15171c">+</span><span class="cat-n">Crear</span></button></div>`;
   box.innerHTML = h;
+}
+
+const CG_PAL = ["#e53935","#ff7043","#ffb300","#fdd835","#c0ca33","#7cb342","#43a047","#17c252","#26a69a","#00acc1","#29b6f6","#1e88e5","#3949ab","#5e35b1","#8e24aa","#d81b60","#ec407a","#8d6e63","#78909c","#546e7a","#2a3ae0","#9a20e0","#e6b800","#5cc8c4"];
+let TI_ALL = null;
+function tiAll(){ if (TI_ALL) return TI_ALL; const s = new Set();
+  try { for (const sh of document.styleSheets){ let rules; try { rules = sh.cssRules; } catch(e){ continue; } for (const r of rules||[]){ const m = r.selectorText && r.selectorText.match(/^\.ti-([a-z0-9-]+)::?before$/); if (m) s.add(m[1]); } } } catch(e){}
+  return TI_ALL = [...s]; }
+function catalogHTML(q, sel){
+  const btn = n => `<button type="button" class="cg-ic${sel==="ti-"+n?" on":""}" data-act="catico" data-v="ti-${n}" aria-label="${n}"><i class="ti ti-${n}" aria-hidden="true"></i></button>`;
+  q = (q||"").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  if (q){ const terms = [q, ...Object.entries(TI_ES).filter(([k])=>k.startsWith(q)||q.startsWith(k)).flatMap(([,v])=>v.split(" "))];
+    const all = tiAll().length ? tiAll() : Object.values(TI_CATALOGO).flat();
+    const res = all.filter(n=>terms.some(t=>n.includes(t))).slice(0,120);
+    return res.length ? `<div class="cg-grid">${res.map(btn).join("")}</div>` : `<p class="sub">Sin resultados. Prueba otra palabra.</p>`; }
+  return Object.entries(TI_CATALOGO).map(([sec, l])=>`<div class="cg-sec">${esc(sec)}</div><div class="cg-grid">${l.map(btn).join("")}</div>`).join("");
 }
 
 /* ================= Eventos ================= */
@@ -163,7 +180,7 @@ document.addEventListener("click", async e=>{
   const nav = e.target.closest("[data-nav]"); if (nav && !$("drawer").hidden) openDrawer(false);
   const a = e.target.closest("[data-act]"); if (!a) return;
   const act = a.dataset.act;
-  const mine = ["drawer","drawerclose","theme","trfhist","trfback","trfnew","trfedit","trfcancel","trfdel","ctaedit","ctanew","ctacancel","ctadel","ctaup","ctadown","grt","grp","grsel","ctt","catedit","catnew","catcancel"];
+  const mine = ["drawer","drawerclose","theme","trfhist","trfback","trfnew","trfedit","trfcancel","trfdel","ctaedit","ctanew","ctacancel","ctadel","ctaup","ctadown","grt","grp","grsel","ctt","catedit","catnew","catcancel","catico","catcol"];
   if (!mine.includes(act)) return;
   e.stopImmediatePropagation();
   const i = a.dataset.i!=null ? +a.dataset.i : null;
@@ -190,10 +207,13 @@ document.addEventListener("click", async e=>{
     case "grsel": S.grSel=i; { const sc=$("gscroll"), keep=sc?sc.scrollLeft:0; renderGraficos(); const sc2=$("gscroll"); if (sc2) sc2.scrollLeft=keep; } return;
     case "ctt": S.ctT=a.dataset.v; S.catEdit=null; renderCategorias(); return;
     case "catedit": { const c=a.dataset.c, ic=catIcon(c,S.ctT||"g"); S.catEdit={n:c, e:ic?ic[0]:"", c:catColor(c,S.ctT||"g")}; renderCategorias(); window.scrollTo(0,0); return; }
-    case "catnew": S.catEdit={nuevo:true,n:"",e:"🏷️",c:"#4d8cf0"}; renderCategorias(); window.scrollTo(0,0); return;
+    case "catnew": S.catEdit={nuevo:true,n:"",e:"ti-tag",c:"#4d8cf0"}; S.catQ=""; renderCategorias(); window.scrollTo(0,0); return;
     case "catcancel": S.catEdit=null; renderCategorias(); return;
+    case "catico": case "catcol": { const n = $("cg-n")?.value; if (n!=null) S.catEdit.n = n; const co = $("cg-c")?.value; if (co) S.catEdit.c = co;
+      if (act==="catico") S.catEdit.e = a.dataset.v; else S.catEdit.c = a.dataset.v; const y = window.scrollY; renderCategorias(); window.scrollTo(0,y); return; }
   }
 }, true);
+document.addEventListener("input", e=>{ if (e.target.id==="cg-q"){ S.catQ = e.target.value; clearTimeout(S._cq); S._cq = setTimeout(()=>{ const n=$("cg-n")?.value; if (n!=null && S.catEdit) S.catEdit.n=n; const co=$("cg-c")?.value; if (co && S.catEdit) S.catEdit.c=co; const y=window.scrollY; renderCategorias(); window.scrollTo(0,y); const q=$("cg-q"); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length);} },250); } });
 document.addEventListener("keydown", e=>{
   if (e.key==="Escape" && !$("drawer").hidden){ openDrawer(false); }
   if ((e.key==="Enter"||e.key===" ") && e.target.matches("g.gb")){ e.preventDefault(); S.grSel=+e.target.dataset.i; renderGraficos(); }

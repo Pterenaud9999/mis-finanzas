@@ -182,7 +182,7 @@ function renderTx(){
   const keep = box.scrollTop, val = evalAmount(x.expr), mxn = txMXN(x);
   const tdcs = S.cards.filter(c=>c.tipo==="TDC").sort((a,b)=>(isUso(b)-isUso(a))||((a.orden||0)-(b.orden||0)));
   const freq = freqCats(x.t); if (x.cat && !freq.includes(x.cat)) freq.unshift(x.cat);
-  const catBtn = c => { const ic=catIcon(c,x.t); return `<button type="button" class="cat-cell${x.cat===c?" on":""}" data-act="txcat" data-c="${esc(c)}"><span class="cat-ic" style="background:${catColor(c,x.t)}">${ic?ic[0]:esc(c[0])}</span><span class="cat-n">${esc(c)}</span></button>`; };
+  const catBtn = c => { const ic=catIcon(c,x.t); return `<button type="button" class="cat-cell${x.cat===c?" on":""}" data-act="txcat" data-c="${esc(c)}"><span class="cat-ic" style="background:${catColor(c,x.t)}">${ic?icHTML(ic[0]):esc(c[0])}</span><span class="cat-n">${esc(c)}</span></button>`; };
   const ayer = iso(new Date(today.getFullYear(),today.getMonth(),today.getDate()-1)), antier = iso(new Date(today.getFullYear(),today.getMonth(),today.getDate()-2));
   const mon = x.mon||"MXN", tdc = x.tdc ? card(x.tdc) : null;
   let h = `<div class="sheet-in"><div class="sheet-top"><button class="btn" data-act="txclose">←</button><b>${x.nuevo?"Añadir transacción":"Modificar transacción"}</b></div>

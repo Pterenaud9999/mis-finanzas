@@ -183,9 +183,11 @@ const CAT_ICONS = {
   "Otros":["❔","#7cc44a"],"Prestamo":["🤝","#17c252"],"Prima vacacional":["💰","#5c9e3a"],"Reembolso":["🔁","#17c252"],"Regalo":["🎁","#e8336d"],"Salario":["💵","#4da3e6"],
   "SAT":["🧾","#5b9bff"],"Utilidades":["💵","#5b9bff"],"Venta":["🏷️","#e6b800"]}
 };
-function catIcon(c,t){ const tt=t||S.mvT||"g", o=S.catCfg?.[tt]?.[c]; if (o) return o; const m = CAT_ICONS[tt]||{}; return m[c] || CAT_ICONS.g[c] || CAT_ICONS.i[c] || null; }
+function catIcon(c,t){ const tt=t||S.mvT||"g", o=S.catCfg?.[tt]?.[c]; if (o) return o; const m = CAT_ICONS[tt]||{}; const base = m[c] || CAT_ICONS.g[c] || CAT_ICONS.i[c] || null;
+  const ti = (TI_CAT[tt]||{})[c] || TI_CAT.g[c] || TI_CAT.i[c]; if (base) return [ti ? "ti-"+ti : base[0], base[1]]; return ti ? ["ti-"+ti, null] : null; }
+function icHTML(v, alt){ return v && /^ti-[a-z0-9-]+$/.test(v) ? `<i class="ti ${v}" aria-hidden="true"></i>` : esc(v || alt || ""); }
 
-function catColor(c,t){ const ic=catIcon(c,t); if (ic) return ic[1]; let h=0; for (const ch of String(c)) h=(h*31+ch.charCodeAt(0))>>>0; return CAT_COLORS[h%CAT_COLORS.length]; }
+function catColor(c,t){ const ic=catIcon(c,t); if (ic && ic[1]) return ic[1]; let h=0; for (const ch of String(c)) h=(h*31+ch.charCodeAt(0))>>>0; return CAT_COLORS[h%CAT_COLORS.length]; }
 function mvRange(){
   const mode = S.mvMode||"mes", d = parseD(S.mvDate||todayISO);
   if (mode==="dia"){ const s=iso(d); return {from:s,to:s,label:(s===todayISO?"Hoy, ":"")+`${d.getDate()} de ${MESL[d.getMonth()].toLowerCase()} (${DIAS[d.getDay()]})`}; }
@@ -247,7 +249,7 @@ function renderMovs(){
   if (S.movEdit && S.movEdit.nuevo) h += movForm(S.movEdit);
   h += `<div class="mv-list">` + cats.map(([c,o])=>{
     const open = S.mvOpenCat===c;
-    let row = `<button class="mv-cat" data-act="mvcat" data-c="${esc(c)}" aria-expanded="${open}"><span class="mv-ic" style="background:${catColor(c)}">${catIcon(c)?catIcon(c)[0]:esc(c.slice(0,1).toUpperCase())}</span><span class="mv-cn">${esc(c)}</span><span class="mv-pc">${Math.round(o.v/totalV*100)} %</span><span class="mv-am num">${fmt(o.v).replace("$","")} $</span></button>`;
+    let row = `<button class="mv-cat" data-act="mvcat" data-c="${esc(c)}" aria-expanded="${open}"><span class="mv-ic" style="background:${catColor(c)}">${catIcon(c)?icHTML(catIcon(c)[0]):esc(c.slice(0,1).toUpperCase())}</span><span class="mv-cn">${esc(c)}</span><span class="mv-pc">${Math.round(o.v/totalV*100)} %</span><span class="mv-am num">${fmt(o.v).replace("$","")} $</span></button>`;
     if (open) row += `<div class="mv-items">` + o.list.slice().sort((a,b)=>b.f.localeCompare(a.f)).map(x=> (S.movEdit && S.movEdit.id===x.id) ? movForm(S.movEdit)
       : `<button class="mrow" data-act="medit" data-id="${esc(x.id)}" data-f="${esc(x.f)}"><span class="mcat">${dShort(x.f)}${x.f.slice(0,4)!==todayISO.slice(0,4)?" "+x.f.slice(2,4):""}</span><span class="mn">${esc(x.n||x.cat)}<span class="sub"> · ${esc(x.cta)}</span></span><span class="num ${x.t==="i"?"inc":""}">${fmt(x.m)}</span></button>`).join("") + `</div>`;
     return `<div class="mv-catw${open?" open":""}">${row}</div>`;

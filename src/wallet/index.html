@@ -6,15 +6,16 @@
 <title>Mis finanzas</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.52.0/dist/tabler-icons-300.min.css">
 <style>
 /* Layout: una columna tipo app de celular; resumen → próximos pagos → wallet apilada → detalle → diferidos → presupuesto */
 :root{
   --bg:#f3f4f7; --surface:#ffffff; --ink:#15171c; --muted:#5d6370; --line:#e1e4ea; --accent:#2457e6;
   --ok:#1f8a4c; --ok-bg:#e3f4ea; --info:#1f5fbf; --info-bg:#e2ecfb; --half:#b45b0a; --half-bg:#fdecd9;
   --warn:#8a6a00; --warn-bg:#fdf4cc; --bad:#c0262d; --bad-bg:#fbe3e4;
-  --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
-  --body:"Figtree", "Segoe UI", system-ui, sans-serif;
+  --display:"Roboto", "Segoe UI", system-ui, sans-serif;
+  --body:"Roboto", "Segoe UI", system-ui, sans-serif;
   color-scheme:light;
 }
 @media (prefers-color-scheme: dark){
@@ -357,6 +358,18 @@ html:root.th-dark{--bg:#0f1115; --surface:#181b21; --ink:#eef0f4; --muted:#9aa1a
 .tk{background:var(--bg)}
 .tk-sum{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:13px}
 .tk-t td{padding:3px 2px}
+.ct-ic{color:#fff}.ct-ic .ti{font-size:20px}.cat-ic .ti{font-size:32px;font-weight:400}.mv-ic .ti{font-size:22px;font-weight:400}.cat-ic.big{width:64px;height:64px}.cat-ic.big .ti{font-size:36px}
+.cg-prev{display:flex;align-items:center;gap:16px}
+.cg-pal{display:flex;flex-wrap:wrap;gap:8px}
+.cg-sw{width:28px;height:28px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0}
+.cg-sw.on{border-color:var(--ink);box-shadow:0 0 0 2px var(--surface) inset}
+.cg-cat label{display:flex;flex-direction:column;gap:4px}
+.cg-sec{font-size:13px;color:var(--muted);margin:12px 0 6px}
+.cg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(48px,1fr));gap:8px}
+.cg-ic{width:48px;height:48px;border-radius:50%;border:0;background:#7d8f86;color:#fff;display:grid;place-items:center;cursor:pointer;padding:0}
+.cg-ic .ti{font-size:28px}
+.cg-ic.on{background:var(--accent);box-shadow:0 0 0 3px var(--surface),0 0 0 5px var(--accent)}
+
 .bk-toast{position:fixed;left:12px;right:12px;top:calc(68px + env(safe-area-inset-top));z-index:60;display:flex;gap:8px;align-items:center;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:14px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,.18);font-size:14px;max-width:560px;margin:0 auto}
 .bk-toast span{flex:1}
 .bk-pref{display:flex;flex-direction:column;gap:4px;padding:8px 14px;font-size:13px;color:var(--muted)}
@@ -1087,6 +1100,10 @@ async function save(fn){
   }
 }
 
+/* Íconos estilo línea (Tabler, peso 300) */
+const TI_CAT = {"g": {"\"Invitar\"": "heart-handshake", "\"Para comidas\"": "meat", "Accesorios o juegos": "device-gamepad-2", "Actividades": "tent", "Agua": "bottle", "Alimentación": "basket", "Antro": "beer", "Apuesta": "dice-5", "Arlette / CASA": "home-heart", "Baño público": "toilet-paper", "Bebidas": "glass-full", "Boda": "rings", "Casa": "home", "Caseta peaje": "road", "CFE": "bulb", "Cine": "ticket", "Compras online": "device-laptop", "Cooperación": "moneybag", "Corte de cabello": "scissors", "Criptomonedas": "currency-bitcoin", "DEPORTES": "ball-basketball", "Despensa": "shopping-cart", "Disposición de efectivo": "cash-banknote", "Educación": "school", "Estacionamiento": "parking", "Estadio": "building-stadium", "Familia": "users-group", "FESTIVIDADES": "confetti", "GAS": "flame", "Gasolina": "gas-station", "Gorda": "paw", "Hospedaje": "building-skyscraper", "Imprevisto": "help-circle", "Internet": "device-desktop", "Inversiones": "chart-bar", "Juegos": "cards", "KEY CAPITAL": "moped", "Lavandería": "wash-machine", "Libros": "book", "Mi love": "diamond", "Otros": "dots", "Papelería": "notebook", "Paquito": "paw", "Perdido": "shield-x", "Prestamo": "cash", "Propina": "coin", "Préstamos": "arrows-exchange", "Regalo": "gift", "RELIGIÓN": "building-church", "RENTA": "moneybag", "Renta de auto": "car-suv", "Ropa": "shirt", "Saldo": "device-mobile-dollar", "Salud": "heart-rate-monitor", "Seguro": "shield-check", "SMARTPHONES": "device-mobile", "Souvenirs": "shopping-bag", "Spotify": "microphone", "Streaming": "movie", "Tarjeta de crédito": "credit-card", "Taxi": "car", "Transporte": "bus", "Trámites gubernamentales": "file-certificate", "Turismo": "ship", "Un gusto": "burger", "Verduras": "apple", "Viaje": "plane"}, "i": {"Aguinaldo": "moneybag", "Ahorros": "pig-money", "Bistec": "refresh", "Bono": "award", "CASA": "home", "CASHBACK": "receipt-refund", "Criptos": "currency-bitcoin", "Encontrado": "coin", "Honorarios": "briefcase", "Interés": "building-bank", "Love": "heart", "Manutención Paquito": "paw", "Otros": "dots", "Prestamo": "heart-handshake", "Prima vacacional": "beach", "Reembolso": "receipt-refund", "Regalo": "gift", "Salario": "cash", "SAT": "receipt-tax", "Utilidades": "chart-pie", "Venta": "tag"}};
+const TI_CATALOGO = {"Finanzas": ["building-bank", "coin", "cash", "cash-banknote", "coins", "moneybag", "pig-money", "wallet", "credit-card", "credit-card-pay", "receipt", "receipt-tax", "receipt-refund", "calculator", "chart-bar", "chart-line", "chart-pie", "trending-up", "percentage", "currency-dollar", "currency-euro", "currency-bitcoin", "report-money", "businessplan", "heart-handshake", "gift-card", "arrows-exchange", "refresh", "scale", "building-store"], "Transporte": ["car", "car-suv", "bus", "train", "plane", "ship", "sailboat", "scooter", "moped", "motorbike", "bike", "gas-station", "parking", "road", "map-pin", "route", "helicopter", "truck", "truck-delivery", "steering-wheel", "ticket", "luggage", "gps"], "Compras": ["shopping-cart", "shopping-bag", "basket", "shirt", "hanger", "shoe", "diamond", "device-mobile", "device-laptop", "device-desktop", "device-tv", "device-gamepad-2", "camera", "gift", "tag", "tags", "package", "box", "sunglasses", "umbrella", "backpack"], "Comida y bebida": ["tools-kitchen-2", "burger", "pizza", "meat", "fish", "egg", "bread", "cheese", "milk", "apple", "carrot", "lemon", "salad", "soup", "coffee", "cup", "glass-full", "glass-cocktail", "beer", "bottle", "ice-cream-2", "cookie", "candy", "grill", "cake", "chef-hat"], "Casa": ["home", "home-heart", "home-dollar", "sofa", "bed", "armchair", "lamp", "key", "tool", "hammer", "paint", "bucket-droplet", "air-conditioning", "wash-machine", "plant-2", "bulb", "flame", "droplet", "trash", "building", "building-skyscraper", "door", "fridge", "microwave"], "Salud": ["heart-rate-monitor", "stethoscope", "pill", "vaccine", "first-aid-kit", "dental", "eyeglass", "heartbeat", "massage", "building-hospital", "medicine-syrup", "bandage", "virus", "activity"], "Belleza": ["scissors", "brush", "spray", "mood-smile-beam", "perfume"], "Entretenimiento": ["movie", "ticket", "music", "microphone", "headphones", "device-gamepad-2", "dice-5", "cards", "confetti", "balloon", "masks-theater", "player-play", "brand-spotify", "book", "books", "building-stadium"], "Cuentas": ["file-invoice", "file-certificate", "phone", "wifi", "bolt", "device-mobile-dollar", "device-mobile-message", "world", "shield-check", "shield-x", "id", "file-text", "receipt-2", "calendar-due"], "Rutina": ["barbell", "run", "bike", "swimming", "yoga", "ball-football", "ball-basketball", "trophy", "stretching", "walk", "clock", "alarm"], "Relax": ["beach", "sun", "mountain", "tent", "campfire", "sailboat", "map-2", "umbrella-2", "luggage"], "Educación": ["school", "book", "notebook", "pencil", "ruler-2", "backpack", "certificate", "award", "brain", "language"], "Familia/Hijos": ["users-group", "users", "baby-carriage", "baby-bottle", "mood-kid", "dog", "cat", "paw", "bone", "horse", "home-heart", "heart"], "Otros": ["dots", "help-circle", "star", "moon", "building-church", "pray", "candle", "world", "tree", "plant", "seedling", "tractor", "leaf", "flag", "alert-triangle", "question-mark"]};
+const TI_ES = {"comida": "food tools-kitchen burger pizza meat", "casa": "home house", "carro": "car", "auto": "car", "coche": "car", "dinero": "cash coin money", "banco": "bank", "tarjeta": "credit-card", "viaje": "plane luggage travel", "avion": "plane", "camion": "bus truck", "perro": "dog paw", "gato": "cat", "salud": "heart medicine pill", "medico": "stethoscope first-aid", "ropa": "shirt hanger", "regalo": "gift", "fiesta": "confetti balloon", "bebida": "glass bottle beer", "cafe": "coffee", "musica": "music", "libro": "book", "escuela": "school", "deporte": "ball", "gym": "barbell", "luz": "bulb bolt", "agua": "droplet bottle", "telefono": "phone device-mobile", "internet": "wifi world", "juego": "device-gamepad dice cards", "bebe": "baby", "niño": "mood-kid baby", "amor": "heart", "iglesia": "church pray", "playa": "beach", "fruta": "apple lemon", "verdura": "carrot salad", "pan": "bread", "super": "shopping-cart basket", "tienda": "building-store shopping"};
 /* ================= Navegación ================= */
 const VIEWS = ["inicio","cuentas","graficos","categorias","despensa","balance","calendario","wallet","presupuesto"];
 function showView(){
@@ -1272,9 +1289,11 @@ const CAT_ICONS = {
   "Otros":["❔","#7cc44a"],"Prestamo":["🤝","#17c252"],"Prima vacacional":["💰","#5c9e3a"],"Reembolso":["🔁","#17c252"],"Regalo":["🎁","#e8336d"],"Salario":["💵","#4da3e6"],
   "SAT":["🧾","#5b9bff"],"Utilidades":["💵","#5b9bff"],"Venta":["🏷️","#e6b800"]}
 };
-function catIcon(c,t){ const tt=t||S.mvT||"g", o=S.catCfg?.[tt]?.[c]; if (o) return o; const m = CAT_ICONS[tt]||{}; return m[c] || CAT_ICONS.g[c] || CAT_ICONS.i[c] || null; }
+function catIcon(c,t){ const tt=t||S.mvT||"g", o=S.catCfg?.[tt]?.[c]; if (o) return o; const m = CAT_ICONS[tt]||{}; const base = m[c] || CAT_ICONS.g[c] || CAT_ICONS.i[c] || null;
+  const ti = (TI_CAT[tt]||{})[c] || TI_CAT.g[c] || TI_CAT.i[c]; if (base) return [ti ? "ti-"+ti : base[0], base[1]]; return ti ? ["ti-"+ti, null] : null; }
+function icHTML(v, alt){ return v && /^ti-[a-z0-9-]+$/.test(v) ? `<i class="ti ${v}" aria-hidden="true"></i>` : esc(v || alt || ""); }
 
-function catColor(c,t){ const ic=catIcon(c,t); if (ic) return ic[1]; let h=0; for (const ch of String(c)) h=(h*31+ch.charCodeAt(0))>>>0; return CAT_COLORS[h%CAT_COLORS.length]; }
+function catColor(c,t){ const ic=catIcon(c,t); if (ic && ic[1]) return ic[1]; let h=0; for (const ch of String(c)) h=(h*31+ch.charCodeAt(0))>>>0; return CAT_COLORS[h%CAT_COLORS.length]; }
 function mvRange(){
   const mode = S.mvMode||"mes", d = parseD(S.mvDate||todayISO);
   if (mode==="dia"){ const s=iso(d); return {from:s,to:s,label:(s===todayISO?"Hoy, ":"")+`${d.getDate()} de ${MESL[d.getMonth()].toLowerCase()} (${DIAS[d.getDay()]})`}; }
@@ -1336,7 +1355,7 @@ function renderMovs(){
   if (S.movEdit && S.movEdit.nuevo) h += movForm(S.movEdit);
   h += `<div class="mv-list">` + cats.map(([c,o])=>{
     const open = S.mvOpenCat===c;
-    let row = `<button class="mv-cat" data-act="mvcat" data-c="${esc(c)}" aria-expanded="${open}"><span class="mv-ic" style="background:${catColor(c)}">${catIcon(c)?catIcon(c)[0]:esc(c.slice(0,1).toUpperCase())}</span><span class="mv-cn">${esc(c)}</span><span class="mv-pc">${Math.round(o.v/totalV*100)} %</span><span class="mv-am num">${fmt(o.v).replace("$","")} $</span></button>`;
+    let row = `<button class="mv-cat" data-act="mvcat" data-c="${esc(c)}" aria-expanded="${open}"><span class="mv-ic" style="background:${catColor(c)}">${catIcon(c)?icHTML(catIcon(c)[0]):esc(c.slice(0,1).toUpperCase())}</span><span class="mv-cn">${esc(c)}</span><span class="mv-pc">${Math.round(o.v/totalV*100)} %</span><span class="mv-am num">${fmt(o.v).replace("$","")} $</span></button>`;
     if (open) row += `<div class="mv-items">` + o.list.slice().sort((a,b)=>b.f.localeCompare(a.f)).map(x=> (S.movEdit && S.movEdit.id===x.id) ? movForm(S.movEdit)
       : `<button class="mrow" data-act="medit" data-id="${esc(x.id)}" data-f="${esc(x.f)}"><span class="mcat">${dShort(x.f)}${x.f.slice(0,4)!==todayISO.slice(0,4)?" "+x.f.slice(2,4):""}</span><span class="mn">${esc(x.n||x.cat)}<span class="sub"> · ${esc(x.cta)}</span></span><span class="num ${x.t==="i"?"inc":""}">${fmt(x.m)}</span></button>`).join("") + `</div>`;
     return `<div class="mv-catw${open?" open":""}">${row}</div>`;
@@ -1461,7 +1480,7 @@ function ctaColor(n){
   if (s.includes("PLERK")) return "#e46fb4";
   return "#7a8190";
 }
-function ctaIcon(n){ const s=n.toUpperCase(); return s.startsWith("EFECTIVO")?"💵":s.includes("DEUDA")?"🏦":(s.includes("AHORRO")||s.includes("EMERGENCIA")||s.includes("MAESTR"))?"🐷":s.startsWith("GBM")||s.includes("PPR")?"📈":"💳"; }
+function ctaIcon(n){ const s=n.toUpperCase(); const k = s.startsWith("EFECTIVO")?"cash":s.includes("DEUDA")?"building-bank":(s.includes("AHORRO")||s.includes("EMERGENCIA")||s.includes("MAESTR"))?"pig-money":s.startsWith("GBM")||s.includes("PPR")?"chart-line":s.includes("SALUD")?"heart-rate-monitor":"wallet"; return `<i class="ti ti-${k}" aria-hidden="true"></i>`; }
 function trfItems(){ const out=[]; Object.values(S.trfDb||{}).forEach(d=>(d.items||[]).forEach(x=>out.push(x))); return out; }
 function ctaSaldo(c){
   let s = +c.s||0;
@@ -1566,7 +1585,7 @@ function renderGraficos(){
     ${T==="general"?`<div class="cal-leg sub"><span><i class="lg" style="background:${COL.I};border:0"></i> ingresos</span><span><i class="lg" style="background:${COL.G};border:0"></i> gastos</span><span><i class="lg" style="background:${COL.ben};border:0"></i> beneficio</span><span><i class="lg" style="background:${COL.per};border:0"></i> pérdida</span></div>`:""}</div>`;
   const label = P==="mes" ? ymLabel(s.k) : P==="semana" ? `Semana del ${dShort(s.from)}` : P==="dia" ? dLong(s.k) : s.k;
   const list = (o,t)=>{ const tot = Object.values(o).reduce((a,v)=>a+v,0); return Object.entries(o).sort((a,b)=>b[1]-a[1]).map(([c,v])=>{ const ic=catIcon(c,t);
-    return `<div class="mv-catw"><div class="mv-cat"><span class="mv-ic" style="background:${catColor(c,t)}">${ic?ic[0]:esc(c[0])}</span><span class="mv-cn">${esc(c)}</span><span class="mv-pc">${Math.round(v/tot*100)} %</span><span class="mv-am num">${fmt(v).replace("$","")} $</span></div></div>`; }).join("") || '<p class="empty">Sin registros.</p>'; };
+    return `<div class="mv-catw"><div class="mv-cat"><span class="mv-ic" style="background:${catColor(c,t)}">${ic?icHTML(ic[0]):esc(c[0])}</span><span class="mv-cn">${esc(c)}</span><span class="mv-pc">${Math.round(v/tot*100)} %</span><span class="mv-am num">${fmt(v).replace("$","")} $</span></div></div>`; }).join("") || '<p class="empty">Sin registros.</p>'; };
   h += `<div class="sec-head"><b>${esc(label)}</b><span class="sub num">Ingresos ${fmt0(s.I)} · Gastos ${fmt0(s.G)}</span></div>`;
   if (T==="general") h += `<b class="sub">Ingresos</b><div class="mv-list">${list(s.i,"i")}</div><b class="sub">Gastos</b><div class="mv-list">${list(s.g,"g")}</div>`;
   else h += `<div class="mv-list">${list(T==="g"?s.g:s.i, T)}</div>`;
@@ -1580,13 +1599,30 @@ function renderCategorias(){
   const t = S.ctT||"g", cats = catList(t);
   let h = `<div class="mv-tabs" role="tablist"><button role="tab" data-act="ctt" data-v="g" aria-selected="${t==="g"}">Gastos</button><button role="tab" data-act="ctt" data-v="i" aria-selected="${t==="i"}">Ingresos</button></div>`;
   if (S.catEdit) h += `<form class="f mform" data-form="cat"><label class="full" for="cg-n">Nombre<input id="cg-n" required maxlength="40" value="${esc(S.catEdit.n||"")}" ${S.catEdit.nuevo?"":"readonly"}></label>
-    <label for="cg-e">Ícono (emoji)<input id="cg-e" maxlength="8" value="${esc(S.catEdit.e||"")}"></label>
-    <label for="cg-c">Color<input id="cg-c" type="color" value="${esc(S.catEdit.c||"#4d8cf0")}"></label>
+    <div class="full cg-prev"><span class="cat-ic big" style="background:${esc(S.catEdit.c||"#4d8cf0")}">${icHTML(S.catEdit.e, (S.catEdit.n||"?")[0])}</span>
+      <input type="hidden" id="cg-e" value="${esc(S.catEdit.e||"")}"><label for="cg-c">Color<input id="cg-c" type="color" value="${esc(S.catEdit.c||"#4d8cf0")}"></label></div>
+    <div class="full cg-pal">${CG_PAL.map(c=>`<button type="button" class="cg-sw${S.catEdit.c===c?" on":""}" style="background:${c}" data-act="catcol" data-v="${c}" aria-label="Color ${c}"></button>`).join("")}</div>
+    <div class="full cg-cat"><label for="cg-q"><span class="sub">Catálogo de íconos</span><input id="cg-q" type="search" placeholder="Buscar (comida, carro, dinero…)" value="${esc(S.catQ||"")}"></label>${catalogHTML(S.catQ, S.catEdit.e)}</div>
     ${S.catEdit.nuevo?"":`<p class="full sub" style="margin:0">El nombre de una categoría con historial no se cambia aquí para no separar tus registros.</p>`}
     <div class="actions full"><button class="btn primary" type="submit">Guardar</button><button class="btn" type="button" data-act="catcancel">Cancelar</button></div></form>`;
-  h += `<div class="cat-grid">` + cats.map(c=>{ const ic=catIcon(c,t); return `<button class="cat-cell" data-act="catedit" data-c="${esc(c)}"><span class="cat-ic" style="background:${catColor(c,t)}">${ic?ic[0]:esc(c[0])}</span><span class="cat-n">${esc(c)}</span></button>`; }).join("") +
+  h += `<div class="cat-grid">` + cats.map(c=>{ const ic=catIcon(c,t); return `<button class="cat-cell" data-act="catedit" data-c="${esc(c)}"><span class="cat-ic" style="background:${catColor(c,t)}">${ic?icHTML(ic[0]):esc(c[0])}</span><span class="cat-n">${esc(c)}</span></button>`; }).join("") +
     `<button class="cat-cell" data-act="catnew"><span class="cat-ic" style="background:#f8c11c;color:#15171c">+</span><span class="cat-n">Crear</span></button></div>`;
   box.innerHTML = h;
+}
+
+const CG_PAL = ["#e53935","#ff7043","#ffb300","#fdd835","#c0ca33","#7cb342","#43a047","#17c252","#26a69a","#00acc1","#29b6f6","#1e88e5","#3949ab","#5e35b1","#8e24aa","#d81b60","#ec407a","#8d6e63","#78909c","#546e7a","#2a3ae0","#9a20e0","#e6b800","#5cc8c4"];
+let TI_ALL = null;
+function tiAll(){ if (TI_ALL) return TI_ALL; const s = new Set();
+  try { for (const sh of document.styleSheets){ let rules; try { rules = sh.cssRules; } catch(e){ continue; } for (const r of rules||[]){ const m = r.selectorText && r.selectorText.match(/^\.ti-([a-z0-9-]+)::?before$/); if (m) s.add(m[1]); } } } catch(e){}
+  return TI_ALL = [...s]; }
+function catalogHTML(q, sel){
+  const btn = n => `<button type="button" class="cg-ic${sel==="ti-"+n?" on":""}" data-act="catico" data-v="ti-${n}" aria-label="${n}"><i class="ti ti-${n}" aria-hidden="true"></i></button>`;
+  q = (q||"").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  if (q){ const terms = [q, ...Object.entries(TI_ES).filter(([k])=>k.startsWith(q)||q.startsWith(k)).flatMap(([,v])=>v.split(" "))];
+    const all = tiAll().length ? tiAll() : Object.values(TI_CATALOGO).flat();
+    const res = all.filter(n=>terms.some(t=>n.includes(t))).slice(0,120);
+    return res.length ? `<div class="cg-grid">${res.map(btn).join("")}</div>` : `<p class="sub">Sin resultados. Prueba otra palabra.</p>`; }
+  return Object.entries(TI_CATALOGO).map(([sec, l])=>`<div class="cg-sec">${esc(sec)}</div><div class="cg-grid">${l.map(btn).join("")}</div>`).join("");
 }
 
 /* ================= Eventos ================= */
@@ -1594,7 +1630,7 @@ document.addEventListener("click", async e=>{
   const nav = e.target.closest("[data-nav]"); if (nav && !$("drawer").hidden) openDrawer(false);
   const a = e.target.closest("[data-act]"); if (!a) return;
   const act = a.dataset.act;
-  const mine = ["drawer","drawerclose","theme","trfhist","trfback","trfnew","trfedit","trfcancel","trfdel","ctaedit","ctanew","ctacancel","ctadel","ctaup","ctadown","grt","grp","grsel","ctt","catedit","catnew","catcancel"];
+  const mine = ["drawer","drawerclose","theme","trfhist","trfback","trfnew","trfedit","trfcancel","trfdel","ctaedit","ctanew","ctacancel","ctadel","ctaup","ctadown","grt","grp","grsel","ctt","catedit","catnew","catcancel","catico","catcol"];
   if (!mine.includes(act)) return;
   e.stopImmediatePropagation();
   const i = a.dataset.i!=null ? +a.dataset.i : null;
@@ -1621,10 +1657,13 @@ document.addEventListener("click", async e=>{
     case "grsel": S.grSel=i; { const sc=$("gscroll"), keep=sc?sc.scrollLeft:0; renderGraficos(); const sc2=$("gscroll"); if (sc2) sc2.scrollLeft=keep; } return;
     case "ctt": S.ctT=a.dataset.v; S.catEdit=null; renderCategorias(); return;
     case "catedit": { const c=a.dataset.c, ic=catIcon(c,S.ctT||"g"); S.catEdit={n:c, e:ic?ic[0]:"", c:catColor(c,S.ctT||"g")}; renderCategorias(); window.scrollTo(0,0); return; }
-    case "catnew": S.catEdit={nuevo:true,n:"",e:"🏷️",c:"#4d8cf0"}; renderCategorias(); window.scrollTo(0,0); return;
+    case "catnew": S.catEdit={nuevo:true,n:"",e:"ti-tag",c:"#4d8cf0"}; S.catQ=""; renderCategorias(); window.scrollTo(0,0); return;
     case "catcancel": S.catEdit=null; renderCategorias(); return;
+    case "catico": case "catcol": { const n = $("cg-n")?.value; if (n!=null) S.catEdit.n = n; const co = $("cg-c")?.value; if (co) S.catEdit.c = co;
+      if (act==="catico") S.catEdit.e = a.dataset.v; else S.catEdit.c = a.dataset.v; const y = window.scrollY; renderCategorias(); window.scrollTo(0,y); return; }
   }
 }, true);
+document.addEventListener("input", e=>{ if (e.target.id==="cg-q"){ S.catQ = e.target.value; clearTimeout(S._cq); S._cq = setTimeout(()=>{ const n=$("cg-n")?.value; if (n!=null && S.catEdit) S.catEdit.n=n; const co=$("cg-c")?.value; if (co && S.catEdit) S.catEdit.c=co; const y=window.scrollY; renderCategorias(); window.scrollTo(0,y); const q=$("cg-q"); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length);} },250); } });
 document.addEventListener("keydown", e=>{
   if (e.key==="Escape" && !$("drawer").hidden){ openDrawer(false); }
   if ((e.key==="Enter"||e.key===" ") && e.target.matches("g.gb")){ e.preventDefault(); S.grSel=+e.target.dataset.i; renderGraficos(); }
@@ -1839,7 +1878,7 @@ function renderTx(){
   const keep = box.scrollTop, val = evalAmount(x.expr), mxn = txMXN(x);
   const tdcs = S.cards.filter(c=>c.tipo==="TDC").sort((a,b)=>(isUso(b)-isUso(a))||((a.orden||0)-(b.orden||0)));
   const freq = freqCats(x.t); if (x.cat && !freq.includes(x.cat)) freq.unshift(x.cat);
-  const catBtn = c => { const ic=catIcon(c,x.t); return `<button type="button" class="cat-cell${x.cat===c?" on":""}" data-act="txcat" data-c="${esc(c)}"><span class="cat-ic" style="background:${catColor(c,x.t)}">${ic?ic[0]:esc(c[0])}</span><span class="cat-n">${esc(c)}</span></button>`; };
+  const catBtn = c => { const ic=catIcon(c,x.t); return `<button type="button" class="cat-cell${x.cat===c?" on":""}" data-act="txcat" data-c="${esc(c)}"><span class="cat-ic" style="background:${catColor(c,x.t)}">${ic?icHTML(ic[0]):esc(c[0])}</span><span class="cat-n">${esc(c)}</span></button>`; };
   const ayer = iso(new Date(today.getFullYear(),today.getMonth(),today.getDate()-1)), antier = iso(new Date(today.getFullYear(),today.getMonth(),today.getDate()-2));
   const mon = x.mon||"MXN", tdc = x.tdc ? card(x.tdc) : null;
   let h = `<div class="sheet-in"><div class="sheet-top"><button class="btn" data-act="txclose">←</button><b>${x.nuevo?"Añadir transacción":"Modificar transacción"}</b></div>

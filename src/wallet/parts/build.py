@@ -1,5 +1,5 @@
 import sys
-app=open('parts/app.js').read(); ext=open('parts/ext.js').read()
+app=open('parts/app.js').read(); ext=open('parts/icons_ti.js').read()+open('parts/ext.js').read()
 def rep(s,a,b):
     assert a in s, a[:70]; return s.replace(a,b)
 app=rep(app,"trash:[], trashOpen:false, confirmTrash:null, apDraft:null};","trash:[], trashOpen:false, confirmTrash:null, apDraft:null, movDb:{}, cash:null, pagosCfg:null};")
