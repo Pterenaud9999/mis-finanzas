@@ -362,7 +362,8 @@ html:root.th-dark.th-green{--bg:#141a0d; --surface:#222a1d; --ink:#eef3ea; --mut
 .tk-t td{padding:3px 2px}
 .wcard{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .stack .wcard{transition:transform .32s cubic-bezier(.2,.9,.3,1.15)}
-.stack.ola-on .wcard{transition:none;will-change:transform}
+.stack.ola-on .wcard{transition:transform .09s linear;will-change:transform;backface-visibility:hidden}
+@media (hover:none){.wcard:hover{transform:none}}
 .stack:not(.v-lista).ola-tactil{touch-action:none}
 .cfg-sec{display:flex;flex-direction:column;gap:4px}
 .cfg-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
@@ -2852,7 +2853,7 @@ function olaLayout(fy){
   let cum = 0;
   els.forEach((e,i)=>{ const shift = Math.max(-tops0[i], cum - total*frac); cum += ex[i];
     const lift = Math.max(0, 1 - Math.abs((fy - (tops0[i]+base/2))/base)/1.2);
-    e.style.transform = `translateY(${shift.toFixed(1)}px) scale(${(1+p.s*lift).toFixed(3)})`; e.style.zIndex = String(i+1); });
+    e.style.transform = `translate3d(0,${Math.round(shift)}px,0) scale(${(1+p.s*lift).toFixed(3)})`; e.style.zIndex = String(i+1); });
   if (top!==-1 && top!==OLA.top){ OLA.top = top; olaTic(); }
 }
 function olaStart(clientY){
@@ -2865,15 +2866,18 @@ function olaStart(clientY){
 }
 function olaMove(clientY){ if (OLA.on) olaLayout(clientY - $("stack").getBoundingClientRect().top); }
 function olaEnd(open){
-  if (!OLA.on) return; OLA.on = false;
+  if (!OLA.on) return; OLA.on = false; OLA.lastOpen = Date.now();
   const id = OLA.top>=0 && OLA.cards[OLA.top] ? OLA.cards[OLA.top].dataset.card : null;
   $("stack")?.classList.remove("ola-on"); olaLayout(null);
-  if (open && id){ OLA.lastOpen = Date.now(); setTimeout(()=>openCard(id), 120); }
+  if (open && id) setTimeout(()=>openCard(id), 120);
 }
 /* Gesto: presionar sobre la pila y deslizar (dedo o mouse). La pila no desplaza la página
    mientras la ola está activa; para desplazarte usa el área fuera de las tarjetas. */
-let olaRAF = 0, olaY = null;
-function olaQueue(y){ olaY = y; if (!olaRAF) olaRAF = requestAnimationFrame(()=>{ olaRAF = 0; if (OLA.on && olaY!=null) olaLayout(olaY - OLA.stTop); }); }
+let olaRAF = 0, olaY = null, olaX = null;
+function olaInside(x, y){ const r = OLA.stRect; if (!r) return false; const bottom = r.top + OLA.tops0[OLA.tops0.length-1] + (OLA.cards[OLA.cards.length-1]?.offsetHeight||0);
+  return x >= r.left && x <= r.right && y >= r.top - 10 && y <= bottom + 10; }
+function olaQueue(x, y){ olaX = x; olaY = y; if (!olaRAF) olaRAF = requestAnimationFrame(()=>{ olaRAF = 0; if (!OLA.on || olaY==null) return;
+  if (olaInside(olaX, olaY)){ OLA.out = false; olaLayout(olaY - OLA.stTop); } else if (!OLA.out){ OLA.out = true; OLA.top = -1; OLA.cards.forEach(e=>{ e.style.transform = ""; }); } }); }
 document.addEventListener("pointerdown", e=>{
   if (!cfgGet().ola || (e.pointerType==="mouse" && e.button!==0)) return;
   const st = e.target.closest && e.target.closest("#stack"); if (!st || st.classList.contains("v-lista")) return;
@@ -2885,12 +2889,12 @@ document.addEventListener("pointermove", e=>{
   if (!OLA.on){
     if (Math.abs(e.clientY-OLA.y0) < 6) return;
     if (!olaStart(OLA.y0)) { OLA.pid = null; return; }
-    OLA.stTop = $("stack").getBoundingClientRect().top;
+    OLA.stRect = $("stack").getBoundingClientRect(); OLA.stTop = OLA.stRect.top; OLA.out = false;
     try { $("stack").setPointerCapture(e.pointerId); } catch(err){}
   }
-  olaQueue(e.clientY);
+  olaQueue(e.clientX, e.clientY);
 });
-const olaUp = e => { if (OLA.pid!==e.pointerId) return; OLA.pid = null; if (OLA.on) olaEnd(e.type==="pointerup"); };
+const olaUp = e => { if (OLA.pid!==e.pointerId) return; OLA.pid = null; if (OLA.on) olaEnd(e.type==="pointerup" && olaInside(e.clientX, e.clientY)); };
 document.addEventListener("pointerup", olaUp);
 document.addEventListener("pointercancel", olaUp);
 /* evita que el "clic" posterior abra otra tarjeta */
