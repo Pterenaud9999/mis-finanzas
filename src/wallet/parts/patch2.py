@@ -65,3 +65,4 @@ app=rep(app,'''    case "delrow": {
       if (S.confirmRow!==key){ S.confirmRow=key; break; }
       if (P.items[idx]?.movId){ if (!a.dataset.mode) break;
         if (a.dataset.mode==="ambos"){ if (db) await save(()=>delMovById(P.items[idx].movId)); resetForms(); break; } }''')
+app=rep(app,'  $("stack").className = "stack v-"+view;','  $("stack").className = "stack v-"+view + ((()=>{ try { return cfgGet().ola; } catch(e){ return false; } })() ? " ola-tactil" : "");')

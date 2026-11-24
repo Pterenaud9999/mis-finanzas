@@ -362,7 +362,8 @@ html:root.th-dark.th-green{--bg:#141a0d; --surface:#222a1d; --ink:#eef3ea; --mut
 .tk-t td{padding:3px 2px}
 .wcard{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .stack .wcard{transition:transform .32s cubic-bezier(.2,.9,.3,1.15)}
-.stack.ola-on .wcard{transition:transform .18s ease-out}
+.stack.ola-on .wcard{transition:none;will-change:transform}
+.stack:not(.v-lista).ola-tactil{touch-action:none}
 .cfg-sec{display:flex;flex-direction:column;gap:4px}
 .cfg-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
 .cfg-row>span{display:flex;flex-direction:column;gap:2px}
@@ -661,7 +662,7 @@ function renderStack(){
   ["uso","sin","mostrar"].forEach(k=>$("wf-"+k).setAttribute("aria-pressed", S.wf===k));
   const list = visibleCards(), view = S.wallet?.vista || "chica";
   ["chica","grande","lista"].forEach(k=>$("wv-"+k).setAttribute("aria-pressed", view===k));
-  $("stack").className = "stack v-"+view;
+  $("stack").className = "stack v-"+view + ((()=>{ try { return cfgGet().ola; } catch(e){ return false; } })() ? " ola-tactil" : "");
   if (view==="lista"){
     $("stack").innerHTML = list.map(c=>{ const u=cardUsage(c);
       const right = c.tipo==="TDC" ? `<span class="num"><b>${fmt0(u.used)}</b> <span class="sub">/ ${fmt0(c.limite||0)}</span></span>` : `<b class="num">${c.saldo!=null?fmt0(c.saldo):"—"}</b>`;
@@ -2869,25 +2870,32 @@ function olaEnd(open){
   $("stack")?.classList.remove("ola-on"); olaLayout(null);
   if (open && id){ OLA.lastOpen = Date.now(); setTimeout(()=>openCard(id), 120); }
 }
-/* táctil: mantener presionado ~0.2 s para activar; si deslizas antes, la página se desplaza normal */
-document.addEventListener("touchstart", e=>{
-  const st = e.target.closest && e.target.closest("#stack"); if (!st || !cfgGet().ola || e.touches.length!==1) return;
-  const t = e.touches[0]; OLA.x0 = t.clientX; OLA.y0 = t.clientY; clearTimeout(OLA.timer);
-  OLA.timer = setTimeout(()=>{ OLA.timer = null; olaStart(OLA.y0); }, 200);
-}, {passive:true});
-document.addEventListener("touchmove", e=>{
-  if (OLA.on){ e.preventDefault(); olaMove(e.touches[0].clientY); return; }
-  if (OLA.timer){ const t = e.touches[0]; if (Math.abs(t.clientY-OLA.y0)>8 || Math.abs(t.clientX-OLA.x0)>8){ clearTimeout(OLA.timer); OLA.timer = null; } }
-}, {passive:false});
-document.addEventListener("touchend", e=>{ clearTimeout(OLA.timer); OLA.timer = null; if (OLA.on){ e.preventDefault(); olaEnd(true); } }, {passive:false});
-document.addEventListener("touchcancel", ()=>{ clearTimeout(OLA.timer); OLA.timer = null; olaEnd(false); });
-/* mouse (PC): presionar y arrastrar */
-document.addEventListener("mousedown", e=>{ if (e.button!==0 || !cfgGet().ola || !e.target.closest("#stack")) return; OLA.y0 = e.clientY; OLA.mdown = true; });
-document.addEventListener("mousemove", e=>{ if (OLA.mdown && !OLA.on && Math.abs(e.clientY-OLA.y0)>6) olaStart(e.clientY); if (OLA.on) olaMove(e.clientY); });
-document.addEventListener("mouseup", ()=>{ OLA.mdown = false; if (OLA.on) olaEnd(true); });
+/* Gesto: presionar sobre la pila y deslizar (dedo o mouse). La pila no desplaza la página
+   mientras la ola está activa; para desplazarte usa el área fuera de las tarjetas. */
+let olaRAF = 0, olaY = null;
+function olaQueue(y){ olaY = y; if (!olaRAF) olaRAF = requestAnimationFrame(()=>{ olaRAF = 0; if (OLA.on && olaY!=null) olaLayout(olaY - OLA.stTop); }); }
+document.addEventListener("pointerdown", e=>{
+  if (!cfgGet().ola || (e.pointerType==="mouse" && e.button!==0)) return;
+  const st = e.target.closest && e.target.closest("#stack"); if (!st || st.classList.contains("v-lista")) return;
+  OLA.pid = e.pointerId; OLA.y0 = e.clientY; OLA.x0 = e.clientX; OLA.moved = false;
+  OLA.stTop = st.getBoundingClientRect().top;
+});
+document.addEventListener("pointermove", e=>{
+  if (OLA.pid!==e.pointerId) return;
+  if (!OLA.on){
+    if (Math.abs(e.clientY-OLA.y0) < 6) return;
+    if (!olaStart(OLA.y0)) { OLA.pid = null; return; }
+    OLA.stTop = $("stack").getBoundingClientRect().top;
+    try { $("stack").setPointerCapture(e.pointerId); } catch(err){}
+  }
+  olaQueue(e.clientY);
+});
+const olaUp = e => { if (OLA.pid!==e.pointerId) return; OLA.pid = null; if (OLA.on) olaEnd(e.type==="pointerup"); };
+document.addEventListener("pointerup", olaUp);
+document.addEventListener("pointercancel", olaUp);
 /* evita que el "clic" posterior abra otra tarjeta */
 document.addEventListener("click", e=>{ if (Date.now()-OLA.lastOpen < 600 && e.target.closest("#stack")){ e.stopImmediatePropagation(); e.preventDefault(); } }, true);
-document.addEventListener("contextmenu", e=>{ if (OLA.on || OLA.timer) e.preventDefault(); });
+document.addEventListener("contextmenu", e=>{ if (OLA.on) e.preventDefault(); });
 
 /* ---------- Pantalla de Configuración ---------- */
 function cfgOpen(){
@@ -2916,7 +2924,7 @@ document.addEventListener("click", e=>{
   if (a.dataset.act==="cfgtest"){ e.stopImmediatePropagation(); olaTic(true); setTimeout(()=>olaTic(true),90); setTimeout(()=>olaTic(true),180); }
 }, true);
 document.addEventListener("change", e=>{
-  if (e.target.id==="cfg-ola"){ cfgSet("ola", e.target.checked); cfgRender(); }
+  if (e.target.id==="cfg-ola"){ cfgSet("ola", e.target.checked); cfgRender(); try { renderStack(); } catch(err){} }
   if (e.target.id==="cfg-snd"){ cfgSet("sonido", e.target.checked); cfgRender(); }
   if (e.target.id==="cfg-vol"){ cfgSet("volumen", +e.target.value); olaTic(true); }
 });
