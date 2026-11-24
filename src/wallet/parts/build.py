@@ -17,7 +17,7 @@ app=rep(app,"    const desc = t.tipo===\"mov\" ?","    const desc = t.tipo===\"t
 app=rep(app,"        if (t.tipo===\"mov\") await writeMonth(","        if (t.tipo===\"trf\") await writeTrfMonth(t.ym, [...trfMonth(t.ym).filter(y=>y.id!==t.data.id), t.data].sort((a,b)=>a.f.localeCompare(b.f)));\n        else if (t.tipo===\"mov\") await writeMonth(")
 app=rep(app,"  db.collection(\"trash\").onSnapshot(","  db.doc(\"config/cuentas\").onSnapshot(s=>{ S.ctas = s.exists ? s.data() : {list:[]}; renderCuentas(); updAb(); }, ()=>{});\n  db.collection(\"trf\").onSnapshot(s=>{ const o={}; s.docs.forEach(d=>o[d.id]=d.data()); S.trfDb=o; renderCuentas(); updAb(); }, ()=>{});\n  db.doc(\"config/cats\").onSnapshot(s=>{ S.catCfg = s.exists ? s.data() : null; renderCategorias(); renderMovs(); }, ()=>{});\n  db.collection(\"trash\").onSnapshot(")
 exec(open('parts/patch2.py',encoding='utf-8').read())
-ext = ext + "\n" + open('parts/app2.js').read() + "\n" + open('parts/app3.js').read() + "\n" + open('parts/backup.js').read() + "\nfunction updAb(){ const b=$(\"ab-total\"); if (!b) return; const t=cuentasTotals(); b.innerHTML = `Total <b class=\"num\">${fmt(t.total)}</b>`; }\n"
+ext = ext + "\n" + open('parts/app2.js').read() + "\n" + open('parts/app3.js').read() + "\n" + open('parts/backup.js').read() + "\n" + open('parts/excel.js').read() + "\nfunction updAb(){ const b=$(\"ab-total\"); if (!b) return; const t=cuentasTotals(); b.innerHTML = `Total <b class=\"num\">${fmt(t.total)}</b>`; }\n"
 marker="/* ---------- Datos ---------- */"
 app=app.replace(marker, ext+"\n"+marker)
 s=open('index.html').read()

@@ -76,7 +76,7 @@ setTimeout(()=>purgeFotos().catch(()=>{}), 8000);
 
 (function(){ const d = $("drawer")?.querySelector(".dr-foot"); if (!d) return;
   const box = document.createElement("div");
-  box.innerHTML = `<div class="dr-sep">Respaldo</div><button data-act="bkexport"><span>⬇️</span>Exportar respaldo</button>` +
+  box.innerHTML = `<div class="dr-sep">Respaldo</div><button data-act="bkexport"><span>⬇️</span>Exportar respaldo</button><button data-act="xlopen"><span>📊</span>Exportar Excel</button>` +
     (window.MF_PWA ? `<label class="bk-pref">Fotos de tickets<select id="bk-fotos"><option value="nunca">Conservar siempre</option><option value="confirmar">Borrar al confirmar los datos</option><option value="30">Borrar después de 30 días</option></select></label><button data-act="bkimport"><span>⬆️</span>Importar respaldo</button><input type="file" id="bk-file" accept="application/json,.json" hidden><button data-act="logout"><span>🚪</span>Cerrar sesión</button>` : "");
   d.before(...box.childNodes); })();
 
