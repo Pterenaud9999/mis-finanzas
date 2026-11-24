@@ -10,10 +10,28 @@ const XL_ST = { // colores tomados de GASTOS_17-10-26_0.xlsx
 const XL_HDR = {fecha:"B4C6E7", rotulo:"FFD966", titulo:"00B050", deuda:"2F5597"};
 let xlLib = null;
 function xlLoad(){
-  if (window.XLSX) return Promise.resolve(window.XLSX);
+  if (window.ExcelJS) return Promise.resolve(window.ExcelJS);
   if (xlLib) return xlLib;
-  const src = window.MF_PWA ? "vendor/xlsx-style.min.js" : "https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.min.js";
-  return xlLib = new Promise((ok,ko)=>{ const s = document.createElement("script"); s.src = src; s.onload = ()=>ok(window.XLSX); s.onerror = ()=>{ xlLib = null; ko(new Error("No se pudo cargar el generador de Excel")); }; document.head.appendChild(s); });
+  const src = window.MF_PWA ? "vendor/exceljs.min.js" : "https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js";
+  return xlLib = new Promise((ok,ko)=>{ const s = document.createElement("script"); s.src = src; s.onload = ()=>ok(window.ExcelJS); s.onerror = ()=>{ xlLib = null; ko(new Error("No se pudo cargar el generador de Excel")); }; document.head.appendChild(s); });
+}
+/* Modelo de hoja simple → ExcelJS */
+const XLM = { encode_cell: ({r,c}) => r+":"+c };
+function xlNewSheet(){ return {cells:{}, merges:[], cols:[]}; }
+function xlToExcel(wb, name, m){
+  const ws = wb.addWorksheet(name, {views:[{showGridLines:true}]});
+  m.cols.forEach((w,i)=>{ if (w) ws.getColumn(i+1).width = w.wch; });
+  Object.entries(m.cells).forEach(([k, c])=>{
+    const [r, col] = k.split(":").map(Number), cell = ws.getCell(r+1, col+1), st = c.s||{};
+    cell.value = c.v;
+    if (st.numFmt) cell.numFmt = st.numFmt;
+    if (st.font) cell.font = {name:st.font.name, size:st.font.sz, bold:st.font.bold, color:{argb:"FF"+st.font.color.rgb}};
+    if (st.fill) cell.fill = {type:"pattern", pattern:"solid", fgColor:{argb:"FF"+st.fill.fgColor.rgb}, bgColor:{indexed:64}};
+    const b = {style:"thin", color:{argb:"FFBFBFBF"}}; cell.border = {top:b, left:b, bottom:b, right:b};
+    if (st.alignment) cell.alignment = {vertical:"middle", horizontal:st.alignment.horizontal, wrapText:!!st.alignment.wrapText};
+  });
+  m.merges.forEach(g=>ws.mergeCells(g.s.r+1, g.s.c+1, g.e.r+1, g.e.c+1));
+  return ws;
 }
 const xlTDC = () => S.cards.filter(c=>c.tipo==="TDC").sort((a,b)=>(a.orden||0)-(b.orden||0));
 const xlPer = id => S.periods.filter(p=>p.card===id && p.due).sort((a,b)=>a.due.localeCompare(b.due));
@@ -88,9 +106,9 @@ function xlCell(v, o={}){
   c.s = s; return c;
 }
 const xlDate = iso => { if (!iso) return ""; const d = parseD(iso); return {__d: Math.round((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(1899,11,30))/86400000)}; };
-function xlSheetTDC(X, sel){
-  const ws = {}, merges = [], cols = []; let maxR = 0;
-  const put = (r, c, cell) => { ws[X.utils.encode_cell({r, c})] = cell; if (r>maxR) maxR = r; };
+function xlSheetTDC(sel){
+  const m = xlNewSheet(), merges = m.merges, cols = m.cols; let maxR = 0;
+  const put = (r, c, cell) => { m.cells[XLM.encode_cell({r, c})] = cell; if (r>maxR) maxR = r; };
   put(0, 1, xlCell("TARJETAS DE CRÉDITO", {b:true, sz:18, fill:XL_HDR.titulo, fc:"FFFFFF", al:"center"}));
   merges.push({s:{r:0,c:1}, e:{r:0,c:Math.max(1, sel.length*4-2)}});
   sel.forEach(({c, ps}, k)=>{
@@ -119,16 +137,13 @@ function xlSheetTDC(X, sel){
       r++;
     });
   });
-  cols[0] = {wch:3};
-  ws["!ref"] = X.utils.encode_range({s:{r:0,c:0}, e:{r:maxR, c:sel.length*4}});
-  ws["!merges"] = merges; ws["!cols"] = cols.map(c=>c||{wch:3}); ws["!freeze"] = {xSplit:0, ySplit:9};
-  return ws;
+  cols[0] = {wch:3}; for (let i=0;i<cols.length;i++) if (!cols[i]) cols[i] = {wch:3};
+  return m;
 }
-function xlTable(X, head, rows, widths){
-  const data = [head.map(t=>xlCell(t, {b:true, fill:XL_HDR.deuda, fc:"FFFFFF", al:"center"})), ...rows.map(r=>r.map(v=>xlCell(v)))];
-  const ws = X.utils.aoa_to_sheet(data.map(r=>r.map(c=>c.v)), {cellDates:false});
-  data.forEach((r,i)=>r.forEach((c,j)=>{ const a = X.utils.encode_cell({r:i,c:j}); ws[a] = c; }));
-  ws["!cols"] = widths.map(w=>({wch:w})); return ws;
+function xlTable(head, rows, widths){
+  const m = xlNewSheet();
+  [head.map(t=>xlCell(t, {b:true, fill:XL_HDR.deuda, fc:"FFFFFF", al:"center"})), ...rows.map(r=>r.map(v=>xlCell(v)))].forEach((r,i)=>r.forEach((c,j)=>{ m.cells[i+":"+j] = c; }));
+  m.cols = widths.map(w=>({wch:w})); return m;
 }
 async function xlGenerate(){
   const x = S.xl; if (!x || x.busy) return;
@@ -137,21 +152,22 @@ async function xlGenerate(){
   if (!Object.values(x.hojas).some(Boolean)){ x.msg = "Elige al menos una hoja."; xlRender(); return; }
   x.busy = true; x.msg = "Preparando el archivo…"; xlRender();
   try {
-    const X = await xlLoad(), wb = X.utils.book_new();
+    const EJ = await xlLoad(), wb = new EJ.Workbook(); wb.creator = "Mis finanzas"; wb.created = new Date();
+    const add = (m, name) => xlToExcel(wb, name, m);
     const allP = sel.flatMap(s=>s.ps);
     const dues = allP.map(p=>p.due).sort();
     const desde = x.modo==="fechas" ? x.desde : (dues[0] ? addMonthsISO(dues[0], -2) : x.desde);
     const hasta = x.modo==="fechas" ? x.hasta : (dues[dues.length-1] || x.hasta);
-    if (x.hojas.tdc && sel.length) X.utils.book_append_sheet(wb, xlSheetTDC(X, sel), "TDC'S");
+    if (x.hojas.tdc && sel.length) add(xlSheetTDC(sel), "TDC'S");
     if (x.hojas.resumen){
       const rows = xlTDC().map(c=>{ const u = cardUsage(c), nx = xlPer(c.id).filter(p=>p.status!=="pagado"&&faltante(p)>0)[0];
         return [cname(c), isUso(c)?"Sí":"No", +c.limite||0, +u.disp||0, +u.used||0, nx?xlDate(nx.due):"", nx?faltante(nx):0, c.fechaCorte?xlDate(c.fechaCorte):""]; });
-      X.utils.book_append_sheet(wb, xlTable(X, ["Tarjeta","En uso","Línea","Disponible","Saldo usado","Próximo pago","Monto por pagar","Fecha de corte"], rows, [26,8,13,13,13,14,15,14]), "Resumen");
+      add(xlTable(["Tarjeta","En uso","Línea","Disponible","Saldo usado","Próximo pago","Monto por pagar","Fecha de corte"], rows, [26,8,13,13,13,14,15,14]), "Resumen");
     }
     if (x.hojas.pagos){
       const rows = []; allP.forEach(p=>(p.pagos||[]).forEach(g=>rows.push([xlDate(g.f), cname(card(p.card)), xlDate(p.due), g.cta, ({total:"Total",minimo:"Mínimo",otro:"Otro monto",concepto:"Por concepto"})[g.tipo]||g.tipo||"", (g.conceptos||[]).join(", "), +g.m||0])));
       rows.sort((a,b)=>(a[0].__d||0)-(b[0].__d||0));
-      X.utils.book_append_sheet(wb, xlTable(X, ["Fecha","Tarjeta","Corte (pago)","Desde la cuenta","Tipo","Conceptos","Monto"], rows, [12,24,13,24,13,30,13]), "Pagos");
+      add(xlTable(["Fecha","Tarjeta","Corte (pago)","Desde la cuenta","Tipo","Conceptos","Monto"], rows, [12,24,13,24,13,30,13]), "Pagos");
     }
     if (x.hojas.msi){
       const ids = new Set(sel.map(s=>s.c.id));
@@ -159,14 +175,14 @@ async function xlGenerate(){
         let tot = p.total||0, pag = p.pagados||0, resta = (tot-pag)*(+p.cuota||0);
         if (p.movId){ const its = S.periods.flatMap(q=>(q.items||[]).filter(i=>i.movId===p.movId && !i.adelanto).map(i=>[q.status==="pagado", +i.monto||0])); tot = its.length; pag = its.filter(i=>i[0]).length; resta = its.filter(i=>!i[0]).reduce((a,i)=>a+i[1],0); }
         return [p.nombre||"", p.card?cname(card(p.card)):"", +p.cuota||0, pag, tot, Math.max(0,tot-pag), resta, +p.intereses||0]; });
-      X.utils.book_append_sheet(wb, xlTable(X, ["Compra","Tarjeta","Mensualidad","Pagadas","Total","Faltan","Saldo por pagar","Intereses"], rows, [30,24,13,9,8,8,15,12]), "MSI");
+      add(xlTable(["Compra","Tarjeta","Mensualidad","Pagadas","Total","Faltan","Saldo por pagar","Intereses"], rows, [30,24,13,9,8,8,15,12]), "MSI");
     }
     if (x.hojas.gastos){
       const rows = itemsRange(desde, hasta).sort((a,b)=>a.f.localeCompare(b.f)).map(it=>[xlDate(it.f), it.t==="g"?"Gasto":"Ingreso", it.cat, it.cta||"", it.n||"", it.t==="g" ? -(+it.m||0) : (+it.m||0), it.tdc ? (({contado:"Contado",msi:"MSI",mci:"Con intereses"})[it.pago||"contado"]) : ""]);
-      X.utils.book_append_sheet(wb, xlTable(X, ["Fecha","Tipo","Categoría","Cuenta","Comentario","Monto","Forma de pago"], rows, [12,9,22,26,30,13,14]), "Gastos");
+      add(xlTable(["Fecha","Tipo","Categoría","Cuenta","Comentario","Monto","Forma de pago"], rows, [12,9,22,26,30,13,14]), "Gastos");
     }
     const fname = `mis-finanzas-${x.modo==="fechas"?x.desde+"_a_"+x.hasta:"tdc-"+todayISO}.xlsx`;
-    const out = X.write(wb, {bookType:"xlsx", type:"array", cellStyles:true});
+    const out = await wb.xlsx.writeBuffer();
     const blob = new Blob([out], {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
     const file = new File([blob], fname, {type:blob.type});
     x.busy = false;
