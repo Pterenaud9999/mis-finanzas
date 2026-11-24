@@ -2057,7 +2057,7 @@ Usa null en lo que no aparezca. Montos en la moneda del comprobante.`, {images: 
 }
 /* ---------- Texto del ticket (Lens / AI Lens / Texto en vivo) ---------- */
 const TK_HEAD = [[/aves|carne|pollo|pescad|salchichon|embutid/i,"prot"],[/fruta|verdura/i,"fv"],[/lacteo|l[aá]cteos|refrigerad|quesos|yoghurt|yogur/i,"lac"],[/abarrote|despensa|granos|enlatad/i,"aba"],[/bebida|refresco|jugo|vino|licor|cerveza/i,"beb"],[/panader|galleta|dulce|botana|snack|confite/i,"snk"],[/limpieza|detergent/i,"limp"],[/perfumer|higiene|cuidado personal|farmacia/i,"hig"],[/hogar|ferreter|bazar/i,"hog"]];
-const TK_KW = [[/pepino|zanahori|jitomat|tomate|cebolla|lechuga|brocol|calabaz|papa|chile|limon|platano|manzana|aguacate|fresa|naranja|pera|uva|espinaca|cilantro|apio|pimiento|nopal|elote|melon|sandia|papaya|pi[nñ]a|mango/i,"fv"],
+const TK_KW = [[/aceite|aguaca\w*\s*1\s?l|1\s?l\s*aguaca|salmas|tostada|galleta de arroz/i,"aba"],[/pepino|zanahori|jitomat|tomate|cebolla|lechuga|brocol|calabaz|papa|chile|limon|platano|manzana|aguacate|fresa|naranja|pera|uva|espinaca|cilantro|apio|pimiento|nopal|elote|melon|sandia|papaya|pi[nñ]a|mango/i,"fv"],
   [/pollo|pechuga|huevo|hue\b|clara|atun|carne|res|cerdo|pescado|salmon|tilapia|jamon|pavo|camaron|molida|bistec/i,"prot"],
   [/leche|queso|qso|yog|yoplait|crema|mantequilla|lala|alpura|danone|griego/i,"lac"],
   [/arroz|frijol|avena|tortilla|pasta|aceite|harina|azucar|sal\b|cafe|atun lata|lenteja|garbanzo|cereal|granola/i,"aba"],
@@ -2068,15 +2068,17 @@ const TK_KW = [[/pepino|zanahori|jitomat|tomate|cebolla|lechuga|brocol|calabaz|p
   [/shampoo|champu|pasta dental|colgate|desodorante|rastrillo|toalla femen|crema corporal|cepillo/i,"hig"]];
 function parseTicketText(txt){
   const num = s => { s = String(s).trim().replace(/\s(\d{2})$/,".$1").replace(/,(\d{2})$/,".$1").replace(/,/g,""); return parseFloat(s); };
-  const lines = String(txt).split(/\r?\n/).map(l=>l.replace(/[|«»“”"'£€¡¿~^`]/g," ").replace(/\s+/g," ").trim()).filter(Boolean);
+  const lines = String(txt).split(/\r?\n/).map(l=>l.replace(/[|«»“”"'£€¡¿~^`$]/g," ").replace(/\s+/g," ").trim())
+    .map(l=>l.replace(/^\d{5,14}\s+(?=\D)/,"").replace(/(\d[.,]\d{2})\s?[TAEN]$/,"$1")).filter(Boolean);
   let tienda = null, total = null, desc = null, tipo = null; const items = [];
   const T = ["Chedraui","Soriana","Walmart","Bodega Aurrera","Sam's Club","Costco","Super Aki","City Market","Oxxo","La Comer","HEB","Mega"];
   for (const l of lines.slice(0,8)){ const t = T.find(t=>l.toLowerCase().replace(/[^a-z]/g,"").includes(t.toLowerCase().replace(/[^a-z]/g,""))); if (t){ tienda = t; break; } }
   const AMT = String.raw`(\d{1,5}(?:[.,]\d{2}|\s\d{2}))\d?`;
   for (const l of lines){
     const L = l.toUpperCase();
-    if (/TOTAL/.test(L) && !/SUBTOTAL|ARTICULOS|ARTÍCULOS|PRECIO|RTICULO/.test(L)){ const m = l.match(/(\d[\d,]*[.,]\d{2})\s*\S?\s*$/); if (m){ if (total==null) total = num(m[1]); break; } continue; }
-    if (/R\.?F\.?C|RFC|SUCURSAL|C\.?P\.|RTICULO|PRECIO|TARJETA|AFILIACI|CAMBIO|\bIVA\b|FOLIO|OPERADOR|CONSTITUYENTES/.test(L)) continue;
+    if (/SUBTOTAL/.test(L)) continue;
+    if (/TOTAL/.test(L) && !/ARTICULOS|ARTÍCULOS|PRECIO|RTICULO/.test(L)){ const m = l.match(/(\d[\d,]*[.,]\d{2})\s*\S?\s*$/); if (m){ if (total==null) total = num(m[1]); break; } continue; }
+    if (/R\.?F\.?C|RFC|SUCURSAL|C\.?P\.|RTICULO|PRECIO|TARJETA|AFILIACI|CAMBIO|\bIVA\b|FOLIO|OPERADOR|CONSTITUYENTES|SOCIO|IMPORTE|AUTORIZ|BANCOMER|EFECTIVO|PAGO CON|REGIMEN|COMPROBANTE|^TDA#|ARQC|\bAID\b/.test(L)) continue;
     if (/DESCUENTO|AHORRO|MONEDERO|PUNTOS|BONIFIC/.test(L)){ const m = l.match(/(\d[\d,]*[.,]\d{2})/); if (m) desc = (desc||0) + num(m[1]); continue; }
     let pre=null, price=null, tot=null, m;
     if ((m = l.match(new RegExp(String.raw`^(.*?[A-Za-zÁÉÍÓÚÑáéíóúñ].*?)\s+(\d{1,4}[.,]\d{2})\s+` + AMT + String.raw`\s*[A-Z0-9]?\s*$`)))){ pre = m[1]; price = num(m[2]); tot = num(m[3]); }
@@ -2084,7 +2086,7 @@ function parseTicketText(txt){
     else if (/^[A-Za-zÁÉÍÓÚÑáéíóúñ ,y]+$/.test(l) && l.length<45){ const h = TK_HEAD.find(([re])=>re.test(l)); if (h) tipo = h[1]; continue; }
     if (!pre || !Number.isFinite(tot) || tot<=0) continue;
     let q = null, d = pre; const qm = pre.match(/^(\S+)\s+(.*)$/);
-    if (qm){ const qv = parseFloat(qm[1].replace(",",".")); if (/^\d{1,3}([.,]\d{1,3})?$/.test(qm[1]) && qv>0 && qv<100){ q = qv; d = qm[2]; } else if (!/[A-Za-z]{3}/.test(qm[1])) d = qm[2]; }
+    if (qm){ const qv = parseFloat(qm[1].replace(",",".")); if (/^\d{1,3}([.,]\d{1,3})?$/.test(qm[1]) && qv>0 && qv<100){ q = qv; d = qm[2]; } else if (!/[A-Za-z]/.test(qm[1])) d = qm[2]; }
     d = d.replace(/^[^A-Za-zÁÉÍÓÚÑáéíóúñ]+/,"").trim(); if (d.replace(/[^A-Za-z]/g,"").length < 3) continue;
     let rev = false;
     if (price){ if (q==null){ q = Math.round(tot/price*1000)/1000; rev = true; }
