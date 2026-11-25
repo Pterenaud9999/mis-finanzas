@@ -57,7 +57,7 @@ function renderCuentas(){
   let h = `<div class="ct-head"><span class="sub">Total</span><b class="bal-big num">${fmt(tt.total)}</b><span class="sub num">Todas las cuentas: ${fmt(tt.todas)}</span></div>
     <div class="ct-acts"><button class="ct-act" data-act="trfhist"><span>🕘</span>Historial de transferencias</button><button class="ct-act" data-act="trfnew"><span>⇄</span>Nueva transferencia</button></div>`;
   if (S.trfEdit) h += trfForm(S.trfEdit);
-  if (S.ctaEdit) h += ctaForm(S.ctaEdit) + (S.ctaEdit.nuevo ? "" : ctaLedgerHTML(S.ctaEdit));
+  if (S.ctaEdit && !S.ctaDelIn) h += ctaForm(S.ctaEdit) + (S.ctaEdit.nuevo ? "" : ctaLedgerHTML(S.ctaEdit));
   h += `<div class="actions"><button class="btn sm${S.ctaUbi?" primary":""}" data-act="ctaubi">📍 ${S.ctaUbi?"Listo":"Ubicar cuentas"}</button></div>`;
   if (S.ctaUbi){
     const grupos = [...tddCards().map(c=>c.id), "efectivo", ""];
@@ -68,12 +68,13 @@ function renderCuentas(){
   }
   const row = (c,i)=>{ const v=ctaSaldo(c);
     return `<button class="ct-row" data-act="ctaedit" data-i="${i}"><span class="ct-ic" style="background:${ctaColor(c.n)}">${ctaIcon(c.n)}</span><span class="ct-n">${esc(c.n)}</span>${c.t?"":'<span class="ct-hid" title="No suma al total" aria-label="No suma al total">⊘</span>'}<span class="num ct-v${v<0?" neg":""}">${fmt(v)}</span></button>`; };
+  const rowW = (c,i)=>`<div class="ct-rw">${row(c,i)}<button type="button" class="ct-x" data-act="ctax" data-i="${i}" aria-label="Eliminar ${esc(c.n)}">×</button></div>${S.ctaDelIn && S.ctaEdit?.i===i ? `<div class="ct-delin">${ctaDelHTML(S.ctaEdit)}</div>` : ""}`;
   if (S.ctaMove) h += ctaMoveHTML();
   h += `<p class="sub ct-tip">Mantén presionada una cuenta y arrástrala para cambiarla de lugar.</p>`;
   h += [...tddCards().map(c=>c.id), "efectivo", ""].map(g=>{
     const its = list.map((c,i)=>({c,i})).filter(o=>ctaEn(o.c)===g); if (!its.length && g==="") return "";
     const tot = its.reduce((a,o)=>a+ctaSaldo(o.c),0);
-    return `<div class="ct-grp" data-g="${esc(g)}"><div class="ct-gh"><span>${g==="efectivo"?"💵":g?"💳":"❔"} ${esc(ctaEnName(g))}</span><span class="num">${fmt(tot)}</span></div><div class="ct-list">${its.map(o=>row(o.c,o.i)).join("") || '<p class="sub ct-empty">Suelta aquí una cuenta</p>'}</div></div>`;
+    return `<div class="ct-grp" data-g="${esc(g)}"><div class="ct-gh"><span>${g==="efectivo"?"💵":g?"💳":"❔"} ${esc(ctaEnName(g))}</span><span class="num">${fmt(tot)}</span></div><div class="ct-list">${its.map(o=>rowW(o.c,o.i)).join("") || '<p class="sub ct-empty">Suelta aquí una cuenta</p>'}</div></div>`;
   }).join("") + `
     <div class="actions"><button class="btn sm" data-act="ctanew">+ Agregar cuenta</button></div>
     <p class="sub" style="margin:0">⊘ = no suma al total (igual que el ojo tachado de tu app). Saldos al ${dLong(BASE_CTAS)}; desde ahí se actualizan con tus movimientos y transferencias.</p>`;
@@ -203,7 +204,7 @@ document.addEventListener("click", async e=>{
   const nav = e.target.closest("[data-nav]"); if (nav && !$("drawer").hidden) openDrawer(false);
   const a = e.target.closest("[data-act]"); if (!a) return;
   const act = a.dataset.act;
-  const mine = ["drawer","drawerclose","theme","trfhist","trfback","trfnew","trfedit","trfcancel","trfdel","ctaedit","ctaubi","ctadelmove","ctadelno","ctanew","ctacancel","ctadel","ctaup","ctadown","grt","grp","grsel","ctt","catedit","catnew","catcancel","catico","catcol"];
+  const mine = ["drawer","drawerclose","theme","trfhist","trfback","trfnew","trfedit","trfcancel","trfdel","ctaedit","ctax","ctaubi","ctadelmove","ctadelno","ctanew","ctacancel","ctadel","ctaup","ctadown","grt","grp","grsel","ctt","catedit","catnew","catcancel","catico","catcol"];
   if (!mine.includes(act)) return;
   e.stopImmediatePropagation();
   const i = a.dataset.i!=null ? +a.dataset.i : null;
@@ -220,14 +221,15 @@ document.addEventListener("click", async e=>{
       const x=S.trfEdit, ym=x.f.slice(0,7); if (db) await save(async()=>{ await toTrash({tipo:"trf", ym, data:{...x}}); await writeTrfMonth(ym, trfMonth(ym).filter(y=>y.id!==x.id)); });
       S.trfEdit=null; S.trfConfirm=false; return; }
     case "ctaubi": S.ctaUbi=!S.ctaUbi; S.ctaEdit=null; renderCuentas(); return;
-    case "ctaedit": S.ctaConfirm=false; S.ctaEdit={...S.ctas.list[i], i}; renderCuentas(); return;
+    case "ctax": S.ctaEdit={...S.ctas.list[i], i}; S.ctaConfirm=true; S.ctaDelIn=true; renderCuentas(); return;
+    case "ctaedit": S.ctaDelIn=false; S.ctaConfirm=false; S.ctaEdit={...S.ctas.list[i], i}; renderCuentas(); return;
     case "ctanew": S.ctaEdit={nuevo:true,n:"",s:0,t:false}; renderCuentas(); return;
     case "ctacancel": S.ctaEdit=null; renderCuentas(); return;
     case "ctaup": case "ctadown": { const l=S.ctas.list.map(x=>({...x})), k=S.ctaEdit.i, j=act==="ctaup"?k-1:k+1; if (j<0||j>=l.length) return; [l[k],l[j]]=[l[j],l[k]]; S.ctaEdit.i=j; if (db) await save(()=>db.doc("config/cuentas").set({...S.ctas, list:l})); return; }
     case "ctadel": { if (!S.ctaConfirm){ S.ctaConfirm=true; renderCuentas(); return; }
       await ctaBorrar(S.ctaEdit, null); return; }
     case "ctadelmove": { const dest = $("ctd-dest")?.value; if (!dest){ $("ctd-dest")?.focus(); return; } await ctaBorrar(S.ctaEdit, dest); return; }
-    case "ctadelno": S.ctaConfirm=false; renderCuentas(); return;
+    case "ctadelno": S.ctaConfirm=false; if (S.ctaDelIn){ S.ctaDelIn=false; S.ctaEdit=null; } renderCuentas(); return;
     case "grt": S.grT=a.dataset.v; renderGraficos(); return;
     case "grp": S.grP=a.dataset.v; S.grSel=null; S.grScrollEnd=true; renderGraficos(); return;
     case "grsel": S.grSel=i; { const sc=$("gscroll"), keep=sc?sc.scrollLeft:0; renderGraficos(); const sc2=$("gscroll"); if (sc2) sc2.scrollLeft=keep; } return;
@@ -365,7 +367,7 @@ async function ctaBorrar(x, dest){
     await toTrash({tipo:"cta", i:x.i, data:{...c}});
     await db.doc("config/cuentas").set({...S.ctas, list:l});
   });
-  S.ctaEdit = null; S.ctaConfirm = false; renderCuentas();
+  S.ctaEdit = null; S.ctaConfirm = false; S.ctaDelIn = false; renderCuentas();
 }
 
 /* ---- Arrastrar cuentas (mantener presionado) ---- */
