@@ -1662,14 +1662,22 @@ function ctaForm(x){
 }
 function ctaDraft(){ const x = S.ctaEdit; if (!x) return; const g = id=>document.getElementById(id);
   if (g("ct-n")) x.n = g("ct-n").value; if (g("ct-s")) x._s = g("ct-s").value; if (g("ct-en")) x._en = g("ct-en").value; if (g("ct-t")) x.t = g("ct-t").checked; if (g("ct-all")) x._all = g("ct-all").checked; }
+function trfOpts(sel, quitar){
+  const list = (S.ctas?.list)||[], grupos = [...tddCards().map(c=>c.id), "efectivo", ""];
+  let h = `<option value="">Elige una cuenta…</option>`;
+  grupos.forEach(g=>{ const its = list.filter(c=>ctaEn(c)===g && c.n!==quitar); if (!its.length) return;
+    h += `<optgroup label="${esc(ctaEnName(g))}">${its.map(c=>`<option value="${esc(c.n)}"${c.n===sel?" selected":""}>${esc(c.n)} · ${fmt(ctaSaldo(c))}</option>`).join("")}</optgroup>`; });
+  if (sel && !list.some(c=>c.n===sel)) h += `<option value="${esc(sel)}" selected>${esc(sel)} (cuenta eliminada)</option>`;
+  return h;
+}
 function trfForm(x){
-  const opts = ctaNames().map(n=>`<option value="${esc(n)}">`).join("");
-  return `<form class="f mform" data-form="trf"><datalist id="dl-ctas">${opts}</datalist>
-    <label class="full" for="tr-de">Transfiere de una cuenta<input id="tr-de" list="dl-ctas" required value="${esc(x.de||"")}"></label>
-    <label class="full" for="tr-a">Transfiere a una cuenta<input id="tr-a" list="dl-ctas" required value="${esc(x.a||"")}"></label>
-    <label for="tr-m">Cantidad (MXN)<input id="tr-m" type="number" step="0.01" min="0.01" required inputmode="decimal" value="${x.m??""}"></label>
+  return `<form class="f mform" data-form="trf" autocomplete="off">
+    <label class="full" for="tr-de">Transfiere de una cuenta<select id="tr-de" required>${trfOpts(x.de||"", null)}</select></label>
+    <label class="full" for="tr-a">Transfiere a una cuenta<select id="tr-a" required>${trfOpts(x.a===x.de?"":(x.a||""), x.de||null)}</select></label>
+    <label for="tr-m">Cantidad (MXN)<input id="tr-m" type="number" step="0.01" min="0.01" required inputmode="decimal" autocomplete="off" value="${x.m??""}"></label>
     <label for="tr-f">Fecha<input id="tr-f" type="date" required value="${esc(x.f||todayISO)}"></label>
-    <label class="full" for="tr-n">Comentario<input id="tr-n" maxlength="120" value="${esc(x.n||"")}"></label>
+    <label class="full" for="tr-n">Comentario<input id="tr-n" maxlength="120" autocomplete="off" value="${esc(x.n||"")}"></label>
+    ${x.dup?`<div class="full tx-warn" role="alert">⚠️ Ya hay una transferencia igual: <b>${esc(x.dup.de)} → ${esc(x.dup.a)}</b> por <b>${fmt(x.dup.m)}</b> el ${dShort(x.dup.f)}. ¿Es otra distinta?<div class="actions"><button class="btn sm primary" type="submit" data-dupok="1">Sí, registrar otra</button><button class="btn sm" type="button" data-act="trfcancel">No, cancelar</button></div></div>`:""}
     <div class="actions full"><button class="btn primary" type="submit">${x.nuevo?"Añadir":"Guardar"}</button><button class="btn" type="button" data-act="trfcancel">Cancelar</button>${x.nuevo?"":`<button class="btn danger" type="button" data-act="trfdel">${S.trfConfirm?"Confirmar eliminar":"Eliminar"}</button>`}</div></form>`;
 }
 function renderTrfHist(){
@@ -1834,6 +1842,9 @@ document.addEventListener("submit", async e=>{
   if (k==="trf"){
     const x=S.trfEdit, it={id: x.nuevo ? "t"+Date.now().toString(36)+Math.random().toString(36).slice(2,5) : x.id, de:$("tr-de").value.trim(), a:$("tr-a").value.trim(), m:Math.round(parseFloat($("tr-m").value)*100)/100, f:$("tr-f").value, n:$("tr-n").value.trim()};
     if (!it.de || !it.a || !(it.m>0) || !it.f || it.de===it.a) return;
+    const dupOk = e.submitter?.dataset?.dupok;
+    const dup = !dupOk && trfItems().find(y=>y.id!==it.id && y.de===it.de && y.a===it.a && Math.abs(y.m-it.m)<0.005 && Math.abs(parseD(y.f)-parseD(it.f))<=3*864e5);
+    if (dup){ S.trfEdit={...x, ...it, id:x.id, nuevo:x.nuevo, f:it.f, dup}; renderCuentas(); return; }
     const ymNew=it.f.slice(0,7), ymOld = x.nuevo ? null : x.f.slice(0,7);
     await save(async()=>{ if (ymOld && ymOld!==ymNew) await writeTrfMonth(ymOld, trfMonth(ymOld).filter(y=>y.id!==it.id)); await writeTrfMonth(ymNew, [...trfMonth(ymNew).filter(y=>y.id!==it.id), it].sort((a,b)=>a.f.localeCompare(b.f))); });
     S.trfEdit=null; renderCuentas(); return;
@@ -2025,6 +2036,10 @@ function mny(v){ return ctaPref().hide ? "$ •••••" : fmt(v); }
 
 document.addEventListener("input", e=>{ if (e.target.id!=="ct-icq") return; S.ctaIcQ = e.target.value; clearTimeout(S._ciq);
   S._ciq = setTimeout(()=>{ const r = document.getElementById("ct-icres"); if (r) r.innerHTML = S.ctaIcQ ? catalogHTML(S.ctaIcQ, S.ctaEdit?.ic).replace(/data-act="catico"/g,'data-act="ctaico"') : ""; }, 200); });
+
+document.addEventListener("change", e=>{ if (e.target.id!=="tr-de" || !S.trfEdit) return;
+  const a = document.getElementById("tr-a"); if (!a) return; const cur = a.value===e.target.value ? "" : a.value;
+  a.innerHTML = trfOpts(cur, e.target.value); });
 
 /* ================= Registro de transacción (como en tu app) ================= */
 const TK_BASE = [["fv","Frutas y verduras","#2fbf4f"],["prot","Proteína","#c0392b"],["lac","Lácteos","#4d8cf0"],["aba","Abarrotes y granos","#b07d2b"],["beb","Bebidas","#2bb5c4"],["snk","Snacks, dulces y pan","#e67e22"],["limp","Limpieza","#16a085"],["hog","Hogar","#7f8c8d"],["hig","Higiene personal","#9b59b6"],["otro","Otro","#9aa1ad"]];
