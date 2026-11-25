@@ -57,7 +57,7 @@ function renderCuentas(){
   let h = `<div class="ct-head"><span class="sub">Total</span><b class="bal-big num">${fmt(tt.total)}</b><span class="sub num">Todas las cuentas: ${fmt(tt.todas)}</span></div>
     <div class="ct-acts"><button class="ct-act" data-act="trfhist"><span>🕘</span>Historial de transferencias</button><button class="ct-act" data-act="trfnew"><span>⇄</span>Nueva transferencia</button></div>`;
   if (S.trfEdit) h += trfForm(S.trfEdit);
-  if (S.ctaEdit && !S.ctaDelIn) h += ctaForm(S.ctaEdit) + (S.ctaEdit.nuevo ? "" : ctaLedgerHTML(S.ctaEdit));
+  if (S.ctaEdit && S.ctaEdit.nuevo) h += ctaForm(S.ctaEdit);
   h += `<div class="actions"><button class="btn sm${S.ctaUbi?" primary":""}" data-act="ctaubi">📍 ${S.ctaUbi?"Listo":"Ubicar cuentas"}</button></div>`;
   if (S.ctaUbi){
     const grupos = [...tddCards().map(c=>c.id), "efectivo", ""];
@@ -68,7 +68,7 @@ function renderCuentas(){
   }
   const row = (c,i)=>{ const v=ctaSaldo(c);
     return `<button class="ct-row" data-act="ctaedit" data-i="${i}"><span class="ct-ic" style="background:${ctaColor(c.n)}">${ctaIcon(c.n)}</span><span class="ct-n">${esc(c.n)}</span>${c.t?"":'<span class="ct-hid" title="No suma al total" aria-label="No suma al total">⊘</span>'}<span class="num ct-v${v<0?" neg":""}">${fmt(v)}</span></button>`; };
-  const rowW = (c,i)=>`<div class="ct-rw${S.ctaSel===i?" sel":""}">${row(c,i)}${S.ctaSel===i?`<button type="button" class="ct-ed" data-act="ctaedit" data-i="${i}" data-go="1" aria-label="Editar ${esc(c.n)}">✏️</button><button type="button" class="ct-x" data-act="ctax" data-i="${i}" aria-label="Eliminar ${esc(c.n)}">×</button>`:""}</div>${S.ctaDelIn && S.ctaEdit?.i===i ? `<div class="ct-delin">${ctaDelHTML(S.ctaEdit)}</div>` : ""}`;
+  const rowW = (c,i)=>`<div class="ct-rw${S.ctaSel===i?" sel":""}">${row(c,i)}${S.ctaSel===i?`<button type="button" class="ct-ed" data-act="ctaedit" data-i="${i}" data-go="1" aria-label="Editar ${esc(c.n)}">✏️</button><button type="button" class="ct-x" data-act="ctax" data-i="${i}" aria-label="Eliminar ${esc(c.n)}">×</button>`:""}</div>${S.ctaEdit && !S.ctaEdit.nuevo && S.ctaEdit.i===i ? `<div class="ct-delin" id="ct-inl">${S.ctaDelIn ? ctaDelHTML(S.ctaEdit) : ctaForm(S.ctaEdit) + (S.ctaLed ? ctaLedgerHTML(S.ctaEdit) : "")}</div>` : ""}`;
   if (S.ctaMove) h += ctaMoveHTML();
   h += `<p class="sub ct-tip">Mantén presionada una cuenta y arrástrala para cambiarla de lugar.</p>`;
   h += [...tddCards().map(c=>c.id), "efectivo", ""].map(g=>{
@@ -79,13 +79,14 @@ function renderCuentas(){
     <div class="actions"><button class="btn sm" data-act="ctanew">+ Agregar cuenta</button></div>
     <p class="sub" style="margin:0">⊘ = no suma al total (igual que el ojo tachado de tu app). Saldos al ${dLong(BASE_CTAS)}; desde ahí se actualizan con tus movimientos y transferencias.</p>`;
   box.innerHTML = h;
+  if (S.ctaScroll){ S.ctaScroll=false; const f=document.getElementById("ct-inl"); if (f){ const r=f.getBoundingClientRect(); if (r.bottom>innerHeight-20 || r.top<60) f.scrollIntoView({block:"nearest", behavior:"smooth"}); } }
 }
 function ctaForm(x){
-  return `<form class="f mform" data-form="cta"><label class="full" for="ct-n">Nombre<input id="ct-n" required maxlength="60" value="${esc(x.n||"")}"></label>
-    <label for="ct-s">Saldo actual<input id="ct-s" type="number" step="0.01" value="${x.nuevo?"":ctaSaldo(x)}"></label>
-    <label class="full" for="ct-en">¿Dónde está el dinero?<select id="ct-en">${ctaEnOpts(x.nuevo?"":ctaEn(x))}</select></label>
-    <label class="chk" for="ct-t" style="align-self:end"><input type="checkbox" id="ct-t" ${x.t?"checked":""}> Suma al total</label>
-    <div class="actions full"><button class="btn primary" type="submit">Guardar</button><button class="btn" type="button" data-act="ctacancel">Cancelar</button>${x.nuevo?"":`<button class="btn sm" type="button" data-act="ctaup">↑</button><button class="btn sm" type="button" data-act="ctadown">↓</button>${S.ctaConfirm?"":`<button class="btn danger" type="button" data-act="ctadel">Eliminar</button>`}`}</div>${!x.nuevo && S.ctaConfirm ? ctaDelHTML(x) : ""}</form>`;
+  return `<form class="f mform ct-fc" data-form="cta"><label class="full" for="ct-n">Nombre<input id="ct-n" required maxlength="60" value="${esc(x.n||"")}"></label>
+    <label for="ct-s">Saldo actual<input id="ct-s" type="number" step="0.01" inputmode="decimal" value="${x.nuevo?"":ctaSaldo(x)}"></label>
+    <label for="ct-en">¿Dónde está?<select id="ct-en">${ctaEnOpts(x.nuevo?"":ctaEn(x))}</select></label>
+    <label class="chk full" for="ct-t"><input type="checkbox" id="ct-t" ${x.t?"checked":""}> Suma al total</label>
+    <div class="actions full"><button class="btn sm primary" type="submit">Guardar</button><button class="btn sm" type="button" data-act="ctacancel">Cancelar</button>${x.nuevo||S.ctaConfirm?"":`<button class="btn sm danger" type="button" data-act="ctadel">Eliminar</button><button class="linkbtn ct-ledbtn" type="button" data-act="ctaled">${S.ctaLed?"Ocultar movimientos":"Ver movimientos"}</button>`}</div>${!x.nuevo && S.ctaConfirm ? ctaDelHTML(x) : ""}</form>`;
 }
 function trfForm(x){
   const opts = ctaNames().map(n=>`<option value="${esc(n)}">`).join("");
@@ -204,7 +205,7 @@ document.addEventListener("click", async e=>{
   const nav = e.target.closest("[data-nav]"); if (nav && !$("drawer").hidden) openDrawer(false);
   const a = e.target.closest("[data-act]"); if (!a) return;
   const act = a.dataset.act;
-  const mine = ["drawer","drawerclose","theme","trfhist","trfback","trfnew","trfedit","trfcancel","trfdel","ctaedit","ctax","ctaubi","ctadelmove","ctadelno","ctanew","ctacancel","ctadel","ctaup","ctadown","grt","grp","grsel","ctt","catedit","catnew","catcancel","catico","catcol"];
+  const mine = ["drawer","drawerclose","theme","trfhist","trfback","trfnew","trfedit","trfcancel","trfdel","ctaedit","ctax","ctaled","ctaubi","ctadelmove","ctadelno","ctanew","ctacancel","ctadel","ctaup","ctadown","grt","grp","grsel","ctt","catedit","catnew","catcancel","catico","catcol"];
   if (!mine.includes(act)) return;
   e.stopImmediatePropagation();
   const i = a.dataset.i!=null ? +a.dataset.i : null;
@@ -221,9 +222,10 @@ document.addEventListener("click", async e=>{
       const x=S.trfEdit, ym=x.f.slice(0,7); if (db) await save(async()=>{ await toTrash({tipo:"trf", ym, data:{...x}}); await writeTrfMonth(ym, trfMonth(ym).filter(y=>y.id!==x.id)); });
       S.trfEdit=null; S.trfConfirm=false; return; }
     case "ctaubi": S.ctaUbi=!S.ctaUbi; S.ctaEdit=null; renderCuentas(); return;
+    case "ctaled": S.ctaLed=!S.ctaLed; renderCuentas(); return;
     case "ctax": S.ctaSel=null; S.ctaEdit={...S.ctas.list[i], i}; S.ctaConfirm=true; S.ctaDelIn=true; renderCuentas(); return;
     case "ctaedit": if (!a.dataset.go && S.ctaSel!==i){ S.ctaSel=i; S.ctaDelIn=false; S.ctaEdit=null; renderCuentas(); return; }
-      S.ctaSel=null; S.ctaDelIn=false; S.ctaConfirm=false; S.ctaEdit={...S.ctas.list[i], i}; renderCuentas(); return;
+      S.ctaSel=null; S.ctaDelIn=false; S.ctaConfirm=false; S.ctaLed=false; S.ctaScroll=true; S.ctaEdit={...S.ctas.list[i], i}; renderCuentas(); return;
     case "ctanew": S.ctaEdit={nuevo:true,n:"",s:0,t:false}; renderCuentas(); return;
     case "ctacancel": S.ctaEdit=null; renderCuentas(); return;
     case "ctaup": case "ctadown": { const l=S.ctas.list.map(x=>({...x})), k=S.ctaEdit.i, j=act==="ctaup"?k-1:k+1; if (j<0||j>=l.length) return; [l[k],l[j]]=[l[j],l[k]]; S.ctaEdit.i=j; if (db) await save(()=>db.doc("config/cuentas").set({...S.ctas, list:l})); return; }
