@@ -62,8 +62,8 @@ function renderCuentas(){
   if (S.ctaUbi){
     const grupos = [...tddCards().map(c=>c.id), "efectivo", ""];
     h += `<p class="sub" style="margin:0">Elige en qué tarjeta de débito real o en efectivo está cada cuenta. Cada grupo debe coincidir con el saldo de esa tarjeta en tu banco.</p>` + grupos.map(g=>{ const its = list.map((c,i)=>({c,i})).filter(o=>ctaEn(o.c)===g); if (!its.length && g==="") return "";
-      const tot = its.reduce((a,o)=>a+ctaSaldo(o.c),0);
-      return `<div class="ubi-g"><div class="sec-head"><b>${g==="efectivo"?"💵 ":g?"💳 ":"❔ "}${esc(ctaEnName(g))}</b><b class="num">${fmt(tot)}</b></div>${its.map(o=>`<div class="ubi-r"><span>${esc(o.c.n)}</span><span class="num">${fmt(ctaSaldo(o.c))}</span><select data-ctaen="${o.i}" aria-label="Dónde está ${esc(o.c.n)}">${ctaEnOpts(g)}</select></div>`).join("") || '<p class="sub" style="margin:4px 0">Sin cuentas.</p>'}</div>`; }).join("");
+      const tot = its.reduce((a,o)=>a+(o.c.t?ctaSaldo(o.c):0),0), todas = its.reduce((a,o)=>a+ctaSaldo(o.c),0);
+      return `<div class="ubi-g"><div class="sec-head"><b>${g==="efectivo"?"💵 ":g?"💳 ":"❔ "}${esc(ctaEnName(g))}</b><b class="num">${fmt(tot)}${Math.abs(todas-tot)>=0.005?` <small class="sub">(con ⊘: ${fmt(todas)})</small>`:""}</b></div>${its.map(o=>`<div class="ubi-r"><span>${esc(o.c.n)}</span><span class="num">${fmt(ctaSaldo(o.c))}</span><select data-ctaen="${o.i}" aria-label="Dónde está ${esc(o.c.n)}">${ctaEnOpts(g)}</select></div>`).join("") || '<p class="sub" style="margin:4px 0">Sin cuentas.</p>'}</div>`; }).join("");
     box.innerHTML = h; return;
   }
   const row = (c,i)=>{ const v=ctaSaldo(c);
@@ -73,8 +73,8 @@ function renderCuentas(){
   h += `<p class="sub ct-tip">Mantén presionada una cuenta y arrástrala para cambiarla de lugar.</p>`;
   h += [...tddCards().map(c=>c.id), "efectivo", ""].map(g=>{
     const its = list.map((c,i)=>({c,i})).filter(o=>ctaEn(o.c)===g); if (!its.length && g==="") return "";
-    const tot = its.reduce((a,o)=>a+ctaSaldo(o.c),0);
-    return `<div class="ct-grp" data-g="${esc(g)}"><div class="ct-gh"><span>${g==="efectivo"?"💵":g?"💳":"❔"} ${esc(ctaEnName(g))}</span><span class="num">${fmt(tot)}</span></div><div class="ct-list">${its.map(o=>rowW(o.c,o.i)).join("") || '<p class="sub ct-empty">Suelta aquí una cuenta</p>'}</div></div>`;
+    const tot = its.reduce((a,o)=>a+(o.c.t?ctaSaldo(o.c):0),0), todas = its.reduce((a,o)=>a+ctaSaldo(o.c),0);
+    return `<div class="ct-grp" data-g="${esc(g)}"><div class="ct-gh"><span>${g==="efectivo"?"💵":g?"💳":"❔"} ${esc(ctaEnName(g))}</span><span class="ct-gt"><span class="num">${fmt(tot)}</span>${Math.abs(todas-tot)>=0.005?`<small class="num">con ⊘: ${fmt(todas)}</small>`:""}</span></div><div class="ct-list">${its.map(o=>rowW(o.c,o.i)).join("") || '<p class="sub ct-empty">Suelta aquí una cuenta</p>'}</div></div>`;
   }).join("") + `
     <div class="actions"><button class="btn sm" data-act="ctanew">+ Agregar cuenta</button></div>
     <p class="sub" style="margin:0">⊘ = no suma al total (igual que el ojo tachado de tu app). Saldos al ${dLong(BASE_CTAS)}; desde ahí se actualizan con tus movimientos y transferencias.</p>`;
@@ -299,7 +299,7 @@ function tddCtas(c){
   const list = (S.ctas?.list)||[]; if (!list.length || c.tipo==="TDC") return [];
   return list.filter(x=>ctaEn(x)===c.id);
 }
-function tddSaldo(c){ const l = tddCtas(c); return l.length ? Math.round(l.reduce((a,x)=>a+ctaSaldo(x),0)*100)/100 : (c.saldo!=null ? +c.saldo : null); }
+function tddSaldo(c, todas){ const l = tddCtas(c); return l.length ? Math.round(l.reduce((a,x)=>a+((todas||x.t)?ctaSaldo(x):0),0)*100)/100 : (c.saldo!=null ? +c.saldo : null); }
 function tddLinkHTML(c){
   if (!((S.ctas?.list)||[]).length) return "";
   const l = tddCtas(c);
@@ -307,8 +307,8 @@ function tddLinkHTML(c){
 }
 function tddCtasHTML(c){
   const l = tddCtas(c); if (!l.length) return "";
-  return `<div><div class="sec-head"><b>Cuentas</b><span class="sub num">${fmt(tddSaldo(c))} en total · se actualiza con Cuentas</span></div>
-    <table class="num"><tbody>${l.filter(x=>Math.abs(ctaSaldo(x))>=0.005).map(x=>`<tr><td>${esc(x.n)}</td><td>${fmt(ctaSaldo(x))}</td></tr>`).join("")}</tbody></table>${l.some(x=>Math.abs(ctaSaldo(x))<0.005)?`<div class="sub">${l.filter(x=>Math.abs(ctaSaldo(x))<0.005).length} cuentas más en $0.00</div>`:""}</div>`;
+  return `<div><div class="sec-head"><b>Cuentas</b><span class="sub num">${fmt(tddSaldo(c))} suman al total${Math.abs(tddSaldo(c,true)-tddSaldo(c))>=0.005?` · con ⊘: ${fmt(tddSaldo(c,true))}`:""}</span></div>
+    <table class="num"><tbody>${l.filter(x=>Math.abs(ctaSaldo(x))>=0.005).map(x=>`<tr><td>${esc(x.n)}${x.t?"":' <span class="sub" title="No suma al total">⊘</span>'}</td><td>${fmt(ctaSaldo(x))}</td></tr>`).join("")}</tbody></table>${l.some(x=>Math.abs(ctaSaldo(x))<0.005)?`<div class="sub">${l.filter(x=>Math.abs(ctaSaldo(x))<0.005).length} cuentas más en $0.00</div>`:""}</div>`;
 }
 
 /* ---- Historial por cuenta ---- */
