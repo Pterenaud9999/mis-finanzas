@@ -465,6 +465,9 @@ html:root.th-dark.th-green{--bg:#141a0d; --surface:#222a1d; --ink:#eef3ea; --mut
 .ct-ghost{position:fixed;z-index:999;pointer-events:none;opacity:.95;box-shadow:0 10px 24px rgba(0,0,0,.25);border-radius:12px;background:var(--surface);transform:scale(1.03)}
 body.ct-dragging{overscroll-behavior:none}
 .ct-mv{margin:8px 0}
+.ct-logo{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.ct-logo .chk{margin-left:auto}
+.ct-logob{border:0;cursor:pointer;flex:none}
+.ct-pick{display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:12px;padding:8px}.ct-pick .cg-grid{max-height:200px;overflow:auto}#ct-icres .cg-sec{font-size:12px}.ct-pick .chk{display:block;font-size:13px}
 .ct-fc{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px 10px;padding:0;margin:0;background:none;border:0}
 .ct-fc label{font-size:12px}.ct-fc input,.ct-fc select{font-size:15px;padding:7px 9px}
 .ct-fc .actions{align-items:center;flex-wrap:wrap;gap:6px}.ct-ledbtn{margin-left:auto;font-size:13px}
@@ -1555,6 +1558,7 @@ function openDrawer(open){
 /* ================= Cuentas (como en tu app) ================= */
 const BASE_CTAS = "2026-11-19";
 function ctaColor(n){
+  const own = ((S.ctas?.list)||[]).find(x=>x.n===n); if (own?.co) return own.co;
   const s = n.toUpperCase();
   if (s.startsWith("EFECTIVO")) return "#17c252";
   if (s.includes("DEUDA") && !s.startsWith("MP")) return "#5c9e3a";
@@ -1569,7 +1573,7 @@ function ctaColor(n){
   if (s.includes("PLERK")) return "#e46fb4";
   return "#7a8190";
 }
-function ctaIcon(n){ const s=n.toUpperCase(); const k = s.startsWith("EFECTIVO")?"cash":s.includes("DEUDA")?"building-bank":(s.includes("AHORRO")||s.includes("EMERGENCIA")||s.includes("MAESTR"))?"pig-money":s.startsWith("GBM")||s.includes("PPR")?"chart-line":s.includes("SALUD")?"heart-rate-monitor":"wallet"; return `<i class="ti ti-${k}" aria-hidden="true"></i>`; }
+function ctaIcon(n){ const own = ((S.ctas?.list)||[]).find(x=>x.n===n); if (own?.ic) return `<i class="ti ${esc(own.ic)}" aria-hidden="true"></i>`; const s=n.toUpperCase(); const k = s.startsWith("EFECTIVO")?"cash":s.includes("DEUDA")?"building-bank":(s.includes("AHORRO")||s.includes("EMERGENCIA")||s.includes("MAESTR"))?"pig-money":s.startsWith("GBM")||s.includes("PPR")?"chart-line":s.includes("SALUD")?"heart-rate-monitor":"wallet"; return `<i class="ti ti-${k}" aria-hidden="true"></i>`; }
 function trfItems(){ const out=[]; Object.values(S.trfDb||{}).forEach(d=>(d.items||[]).forEach(x=>out.push(x))); return out; }
 function ctaIs(c){ const al = c.alias||[]; return v => v===c.n || (al.length>0 && al.includes(v)); }
 function ctaSaldo(c){
@@ -1617,12 +1621,28 @@ function renderCuentas(){
   if (S.ctaScroll){ S.ctaScroll=false; const f=document.getElementById("ct-inl"); if (f){ const r=f.getBoundingClientRect(); if (r.bottom>innerHeight-20 || r.top<60) f.scrollIntoView({block:"nearest", behavior:"smooth"}); } }
 }
 function ctaForm(x){
-  return `<form class="f mform ct-fc" data-form="cta"><label class="full" for="ct-n">Nombre<input id="ct-n" required maxlength="60" value="${esc(x.n||"")}"></label>
-    <label for="ct-s">Saldo actual<input id="ct-s" type="number" step="0.01" inputmode="decimal" value="${x.nuevo?"":ctaSaldo(x)}"></label>
-    <label for="ct-en">¿Dónde está?<select id="ct-en">${ctaEnOpts(x.nuevo?"":ctaEn(x))}</select></label>
-    <label class="chk full" for="ct-t"><input type="checkbox" id="ct-t" ${x.t?"checked":""}> Suma al total</label>
-    <div class="actions full"><button class="btn sm primary" type="submit">Guardar</button><button class="btn sm" type="button" data-act="ctacancel">Cancelar</button>${x.nuevo||S.ctaConfirm?"":`<button class="btn sm danger" type="button" data-act="ctadel">Eliminar</button><button class="linkbtn ct-ledbtn" type="button" data-act="ctaled">${S.ctaLed?"Ocultar movimientos":"Ver movimientos"}</button>`}</div>${!x.nuevo && S.ctaConfirm ? ctaDelHTML(x) : ""}</form>`;
+  const orig = x.nuevo ? null : S.ctas.list[x.i];
+  const sal = x._s ?? (orig ? ctaSaldo(orig) : ""), en = x._en ?? (orig ? ctaEn(orig) : "");
+  const ic = x.ic ?? orig?.ic, co = x.co ?? orig?.co;
+  const prevIc = ic ? `<i class="ti ${esc(ic)}" aria-hidden="true"></i>` : ctaIcon(orig?.n||x.n||"");
+  const prevCo = co || ctaColor(orig?.n||x.n||"");
+  let h = `<form class="f mform ct-fc" data-form="cta"><label class="full" for="ct-n">Nombre<input id="ct-n" required maxlength="60" value="${esc(x.n||"")}"></label>
+    <label for="ct-s">Saldo actual<input id="ct-s" type="number" step="0.01" inputmode="decimal" value="${esc(sal)}"></label>
+    <label for="ct-en">¿Dónde está?<select id="ct-en">${ctaEnOpts(en)}</select></label>
+    <div class="full ct-logo"><button type="button" class="ct-ic ct-logob" style="background:${esc(prevCo)}" data-act="ctalogo" aria-label="Cambiar logotipo" aria-expanded="${!!S.ctaLogo}">${prevIc}</button><button type="button" class="linkbtn" data-act="ctalogo">${S.ctaLogo?"Cerrar logotipos":"Cambiar logotipo"}</button>
+      <label class="chk" for="ct-t"><input type="checkbox" id="ct-t" ${x.t?"checked":""}> Suma al total</label></div>`;
+  if (S.ctaLogo){
+    const base = ["wallet","building-bank","cash","credit-card","pig-money","coin","coins","moneybag","currency-dollar","receipt","home","car","heart-rate-monitor","shopping-cart","gift","school","plane","tool","device-mobile","chart-line","lock","star"];
+    h += `<div class="full ct-pick"><div class="cg-pal">${CG_PAL.map(c=>`<button type="button" class="cg-sw${co===c?" on":""}" style="background:${c}" data-act="ctacol" data-v="${c}" aria-label="Color ${c}"></button>`).join("")}</div>
+      <div class="cg-grid">${base.map(n=>`<button type="button" class="cg-ic${ic==="ti-"+n?" on":""}" data-act="ctaico" data-v="ti-${n}" aria-label="${n}"><i class="ti ti-${n}" aria-hidden="true"></i></button>`).join("")}</div>
+      <input id="ct-icq" type="search" placeholder="Buscar otro ícono (ej. avión, salud, comida)…" value="${esc(S.ctaIcQ||"")}" aria-label="Buscar ícono">
+      <div id="ct-icres">${S.ctaIcQ ? catalogHTML(S.ctaIcQ, ic).replace(/data-act="catico"/g,'data-act="ctaico"') : ""}</div>
+      ${x.nuevo?"":`<label class="chk" for="ct-all"><input type="checkbox" id="ct-all" ${x._all?"checked":""}> Usar este logotipo en todas las cuentas de <b>${esc(ctaEnName(en))}</b></label>`}</div>`;
+  }
+  return h + `<div class="actions full"><button class="btn sm primary" type="submit">Guardar</button><button class="btn sm" type="button" data-act="ctacancel">Cancelar</button>${x.nuevo||S.ctaConfirm?"":`<button class="btn sm danger" type="button" data-act="ctadel">Eliminar</button><button class="linkbtn ct-ledbtn" type="button" data-act="ctaled">${S.ctaLed?"Ocultar movimientos":"Ver movimientos"}</button>`}</div>${!x.nuevo && S.ctaConfirm ? ctaDelHTML(x) : ""}</form>`;
 }
+function ctaDraft(){ const x = S.ctaEdit; if (!x) return; const g = id=>document.getElementById(id);
+  if (g("ct-n")) x.n = g("ct-n").value; if (g("ct-s")) x._s = g("ct-s").value; if (g("ct-en")) x._en = g("ct-en").value; if (g("ct-t")) x.t = g("ct-t").checked; if (g("ct-all")) x._all = g("ct-all").checked; }
 function trfForm(x){
   const opts = ctaNames().map(n=>`<option value="${esc(n)}">`).join("");
   return `<form class="f mform" data-form="trf"><datalist id="dl-ctas">${opts}</datalist>
@@ -1740,7 +1760,7 @@ document.addEventListener("click", async e=>{
   const nav = e.target.closest("[data-nav]"); if (nav && !$("drawer").hidden) openDrawer(false);
   const a = e.target.closest("[data-act]"); if (!a) return;
   const act = a.dataset.act;
-  const mine = ["drawer","drawerclose","theme","trfhist","trfback","trfnew","trfedit","trfcancel","trfdel","ctaedit","ctax","ctaled","ctaeye","ctafold","ctaubi","ctadelmove","ctadelno","ctanew","ctacancel","ctadel","ctaup","ctadown","grt","grp","grsel","ctt","catedit","catnew","catcancel","catico","catcol"];
+  const mine = ["drawer","drawerclose","theme","trfhist","trfback","trfnew","trfedit","trfcancel","trfdel","ctaedit","ctax","ctaled","ctalogo","ctaico","ctacol","ctaeye","ctafold","ctaubi","ctadelmove","ctadelno","ctanew","ctacancel","ctadel","ctaup","ctadown","grt","grp","grsel","ctt","catedit","catnew","catcancel","catico","catcol"];
   if (!mine.includes(act)) return;
   e.stopImmediatePropagation();
   const i = a.dataset.i!=null ? +a.dataset.i : null;
@@ -1759,12 +1779,15 @@ document.addEventListener("click", async e=>{
     case "ctaubi": S.ctaUbi=!S.ctaUbi; S.ctaEdit=null; renderCuentas(); return;
     case "ctaeye": { const p=ctaPref(); p.hide=!p.hide; ctaPrefSet(p); renderCuentas(); return; }
     case "ctafold": { const p=ctaPref(), g=a.dataset.g; p.coll = p.coll.includes(g) ? p.coll.filter(x=>x!==g) : [...p.coll, g]; ctaPrefSet(p); renderCuentas(); return; }
+    case "ctalogo": ctaDraft(); S.ctaLogo=!S.ctaLogo; renderCuentas(); return;
+    case "ctaico": ctaDraft(); S.ctaEdit.ic=a.dataset.v; renderCuentas(); return;
+    case "ctacol": ctaDraft(); S.ctaEdit.co=a.dataset.v; renderCuentas(); return;
     case "ctaled": S.ctaLed=!S.ctaLed; renderCuentas(); return;
     case "ctax": S.ctaSel=null; S.ctaEdit={...S.ctas.list[i], i}; S.ctaConfirm=true; S.ctaDelIn=true; renderCuentas(); return;
     case "ctaedit": if (!a.dataset.go && S.ctaSel!==i){ S.ctaSel=i; S.ctaDelIn=false; S.ctaEdit=null; renderCuentas(); return; }
-      S.ctaSel=null; S.ctaDelIn=false; S.ctaConfirm=false; S.ctaLed=false; S.ctaScroll=true; S.ctaEdit={...S.ctas.list[i], i}; renderCuentas(); return;
+      S.ctaSel=null; S.ctaDelIn=false; S.ctaConfirm=false; S.ctaLed=false; S.ctaScroll=true; S.ctaLogo=false; S.ctaIcQ=""; S.ctaEdit={...S.ctas.list[i], i}; renderCuentas(); return;
     case "ctanew": S.ctaEdit={nuevo:true,n:"",s:0,t:false}; renderCuentas(); return;
-    case "ctacancel": S.ctaEdit=null; renderCuentas(); return;
+    case "ctacancel": S.ctaEdit=null; S.ctaLogo=false; S.ctaIcQ=""; renderCuentas(); return;
     case "ctaup": case "ctadown": { const l=S.ctas.list.map(x=>({...x})), k=S.ctaEdit.i, j=act==="ctaup"?k-1:k+1; if (j<0||j>=l.length) return; [l[k],l[j]]=[l[j],l[k]]; S.ctaEdit.i=j; if (db) await save(()=>db.doc("config/cuentas").set({...S.ctas, list:l})); return; }
     case "ctadel": { if (!S.ctaConfirm){ S.ctaConfirm=true; renderCuentas(); return; }
       await ctaBorrar(S.ctaEdit, null); return; }
@@ -1800,8 +1823,11 @@ document.addEventListener("submit", async e=>{
     const x=S.ctaEdit, l=((S.ctas?.list)||[]).map(y=>({...y}));
     const n=$("ct-n").value.trim(), deseado=parseFloat($("ct-s").value||"0"), t=$("ct-t").checked; if (!n) return;
     const en=$("ct-en")?$("ct-en").value:undefined;
-    if (x.nuevo) l.push({n, s:deseado||0, t, ...(en!=null?{en}:{})});
-    else { const old=l[x.i]; const actual=ctaSaldo(old); l[x.i]={...old, n, t, s:Math.round(((+old.s||0)+(deseado-actual))*100)/100}; if (en!=null) l[x.i].en=en; if (n!==old.n) l[x.i].alias=[...new Set([...(old.alias||[]), old.n])]; }
+    const look = {...(x.ic?{ic:x.ic}:{}), ...(x.co?{co:x.co}:{})};
+    if (x.nuevo) l.push({n, s:deseado||0, t, ...(en!=null?{en}:{}), ...look});
+    else { const old=l[x.i]; const actual=ctaSaldo(old); l[x.i]={...old, n, t, s:Math.round(((+old.s||0)+(deseado-actual))*100)/100}; if (en!=null) l[x.i].en=en; if (n!==old.n) l[x.i].alias=[...new Set([...(old.alias||[]), old.n])]; Object.assign(l[x.i], look);
+      if ($("ct-all")?.checked){ const me = l[x.i], lk = {ic: me.ic || ((ctaIcon(old.n).match(/ti-[a-z0-9-]+/)||[])[0]), co: me.co || ctaColor(old.n)}; const g0 = ctaEn(me); l.forEach(o=>{ if (ctaEn(o)===g0) Object.assign(o, lk); }); } }
+    S.ctaLogo=false; S.ctaIcQ="";
     await save(()=>db.doc("config/cuentas").set({...(S.ctas||{}), list:l})); S.ctaEdit=null; renderCuentas(); return;
   }
   if (k==="cat"){
@@ -1977,6 +2003,9 @@ document.addEventListener("click", e=>{ if (S.ctaSel==null || e.target.closest?.
 function ctaPref(){ try{ const p = JSON.parse(localStorage.getItem("mf-ctavista")||"{}"); return {hide:!!p.hide, coll:Array.isArray(p.coll)?p.coll:[]}; }catch(e){ return {hide:false, coll:[]}; } }
 function ctaPrefSet(p){ try{ localStorage.setItem("mf-ctavista", JSON.stringify(p)); }catch(e){} }
 function mny(v){ return ctaPref().hide ? "$ •••••" : fmt(v); }
+
+document.addEventListener("input", e=>{ if (e.target.id!=="ct-icq") return; S.ctaIcQ = e.target.value; clearTimeout(S._ciq);
+  S._ciq = setTimeout(()=>{ const r = document.getElementById("ct-icres"); if (r) r.innerHTML = S.ctaIcQ ? catalogHTML(S.ctaIcQ, S.ctaEdit?.ic).replace(/data-act="catico"/g,'data-act="ctaico"') : ""; }, 200); });
 
 /* ================= Registro de transacción (como en tu app) ================= */
 const TK_BASE = [["fv","Frutas y verduras","#2fbf4f"],["prot","Proteína","#c0392b"],["lac","Lácteos","#4d8cf0"],["aba","Abarrotes y granos","#b07d2b"],["beb","Bebidas","#2bb5c4"],["snk","Snacks, dulces y pan","#e67e22"],["limp","Limpieza","#16a085"],["hog","Hogar","#7f8c8d"],["hig","Higiene personal","#9b59b6"],["otro","Otro","#9aa1ad"]];
