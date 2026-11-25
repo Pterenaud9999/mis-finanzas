@@ -248,3 +248,26 @@ document.addEventListener("submit", async e=>{
     await save(()=>db.doc("config/cats").set(cfg)); S.catEdit=null; renderCategorias(); return;
   }
 }, true);
+
+/* ---- Tarjetas de débito ligadas a Cuentas ---- */
+function tddNorm(t){ return String(t||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,""); }
+function tddCtas(c){
+  const list = (S.ctas?.list)||[]; if (!list.length || c.tipo==="TDC") return [];
+  if (Array.isArray(c.ctas)) return list.filter(x=>c.ctas.includes(x.n));
+  const nm = tddNorm(cname(c)+" "+(c.banco||""));
+  if (/mercado ?pago|\bmp\b/.test(nm)) return list.filter(x=>/^mp\b|mercado ?pago/.test(tddNorm(x.n)));
+  if (/open ?bank/.test(nm)) return list.filter(x=>/^open ?bank|^open\b/.test(tddNorm(x.n)));
+  const w = (nm.match(/[a-z]{3,}/g)||[]).filter(t=>!["tarjeta","debito","cuenta","nomina","card"].includes(t))[0];
+  return w ? list.filter(x=>{ const n = tddNorm(x.n); return new RegExp("\\b"+w+"\\b").test(n) && !/deuda/.test(n); }) : [];
+}
+function tddSaldo(c){ const l = tddCtas(c); return l.length ? Math.round(l.reduce((a,x)=>a+ctaSaldo(x),0)*100)/100 : (c.saldo!=null ? +c.saldo : null); }
+function tddLinkHTML(c){
+  const list = (S.ctas?.list)||[]; if (!list.length) return "";
+  const on = new Set(tddCtas(c).map(x=>x.n));
+  return `<div class="full"><div class="sub">Cuentas que forman esta tarjeta (su saldo se calcula solo desde Cuentas)</div><div class="tdd-ctas">${list.map((x,i)=>`<label class="chk" for="e-tc-${i}"><input type="checkbox" id="e-tc-${i}" data-tddcta="${esc(x.n)}" ${on.has(x.n)?"checked":""}> ${esc(x.n)} <span class="sub num">${fmt(ctaSaldo(x))}</span></label>`).join("")}</div></div>`;
+}
+function tddCtasHTML(c){
+  const l = tddCtas(c); if (!l.length) return "";
+  return `<div><div class="sec-head"><b>Cuentas</b><span class="sub num">${fmt(tddSaldo(c))} en total · se actualiza con Cuentas</span></div>
+    <table class="num"><tbody>${l.filter(x=>Math.abs(ctaSaldo(x))>=0.005).map(x=>`<tr><td>${esc(x.n)}</td><td>${fmt(ctaSaldo(x))}</td></tr>`).join("")}</tbody></table>${l.some(x=>Math.abs(ctaSaldo(x))<0.005)?`<div class="sub">${l.filter(x=>Math.abs(ctaSaldo(x))<0.005).length} cuentas más en $0.00</div>`:""}</div>`;
+}

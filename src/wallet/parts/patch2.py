@@ -66,3 +66,15 @@ app=rep(app,'''    case "delrow": {
       if (P.items[idx]?.movId){ if (!a.dataset.mode) break;
         if (a.dataset.mode==="ambos"){ if (db) await save(()=>delMovById(P.items[idx].movId)); resetForms(); break; } }''')
 app=rep(app,'  $("stack").className = "stack v-"+view;','  $("stack").className = "stack v-"+view + ((()=>{ try { return cfgGet().ola; } catch(e){ return false; } })() ? " ola-tactil" : "");')
+# --- Débito: saldo desde Cuentas ---
+app=rep(app,'<div><div class="wsmall">Saldo</div><div class="wbig num">${c.saldo!=null?fmt0(c.saldo):"Sin capturar"}</div></div>','<div><div class="wsmall">Saldo</div><div class="wbig num">${tddSaldo(c)!=null?fmt0(tddSaldo(c)):"Sin capturar"}</div></div>')
+app=rep(app,': `<b class="num">${c.saldo!=null?fmt0(c.saldo):"—"}</b>`;',': `<b class="num">${tddSaldo(c)!=null?fmt0(tddSaldo(c)):"—"}</b>`;')
+app=rep(app,'const s = all.reduce((a,c)=>a+(+c.saldo||0),0);','const s = all.reduce((a,c)=>a+(+tddSaldo(c)||0),0);')
+app=rep(app,'<b>${all.filter(c=>c.saldo==null).length}</b>','<b>${all.filter(c=>tddSaldo(c)==null).length}</b>')
+app=rep(app,'<div><span>Saldo</span><b class="num">${c.saldo!=null?fmt(c.saldo):"Sin capturar"}</b></div>','<div><span>Saldo</span><b class="num">${tddSaldo(c)!=null?fmt(tddSaldo(c)):"Sin capturar"}</b></div>')
+app=rep(app,'''function apartadosHTML(c){
+  const ap = c.apartados||[]; if (!ap.length) return "";''','''function apartadosHTML(c){
+  if (tddCtas(c).length) return tddCtasHTML(c);
+  const ap = c.apartados||[]; if (!ap.length) return "";''')
+app=rep(app,': `<label for="e-saldo">Saldo total de la cuenta<input id="e-saldo" type="number" step="0.01" value="${c.saldo??""}"></label>',': tddLinkHTML(c) + `<label for="e-saldo">Saldo manual (solo si no eliges cuentas arriba)<input id="e-saldo" type="number" step="0.01" value="${c.saldo??""}"></label>')
+app=rep(app,'} else { upd.saldo = num("e-saldo"); readAp();','} else { upd.saldo = num("e-saldo"); if (document.querySelector("[data-tddcta]")) upd.ctas = [...document.querySelectorAll("[data-tddcta]:checked")].map(x=>x.dataset.tddcta); readAp();')

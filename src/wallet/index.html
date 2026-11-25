@@ -439,6 +439,8 @@ html:root.th-dark.th-green{--bg:#141a0d; --surface:#222a1d; --ink:#eef3ea; --mut
 .f .pay-it:first-child{border-top:0}
 .f .pay-it input{margin:0;width:18px;height:18px}
 .ini{display:flex;flex-direction:column;gap:6px}
+.tdd-ctas{display:flex;flex-direction:column;gap:2px;max-height:240px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:6px 10px;margin-top:4px}
+.tdd-ctas .chk{font-size:13px}
 .f .ini-it select{display:block;width:100%;margin-top:4px;font-size:12px;padding:4px 6px}
 .f .ini-it select.ini-miss{border-color:var(--bad)}
 .paid-tag{font-size:11px;color:var(--ok);font-weight:600}
@@ -638,7 +640,7 @@ function cardFace(c){
   const bottom = c.tipo==="TDC"
     ? `<div><div class="wsmall">${u.banco?"Saldo (banco)":"Comprometido"}</div><div class="wbig num">${fmt0(u.used)}</div></div>
        <div style="text-align:right"><div class="wsmall">Línea ${fmt0(c.limite||0)}</div><div class="wsmall">Uso ${Math.round(u.pct*100)}%</div></div>`
-    : `<div><div class="wsmall">Saldo</div><div class="wbig num">${c.saldo!=null?fmt0(c.saldo):"Sin capturar"}</div></div>
+    : `<div><div class="wsmall">Saldo</div><div class="wbig num">${tddSaldo(c)!=null?fmt0(tddSaldo(c)):"Sin capturar"}</div></div>
        <div style="text-align:right" class="wsmall">${esc(c.uso||"")}</div>`;
   return `<div class="wtop"><div><div class="wname">${esc(c.nombre)}</div><div class="wsmall">${esc(c.producto||"")}</div></div><div class="wright">${badges}<span class="wkind">${esc(c.tipo)}</span></div></div>
     ${c.tipo==="TDC"?'<div class="chip"></div>':""}<div class="wbot">${bottom}</div>`;
@@ -650,7 +652,7 @@ function renderStack(){
   $("stack").className = "stack v-"+view + ((()=>{ try { return cfgGet().ola; } catch(e){ return false; } })() ? " ola-tactil" : "");
   if (view==="lista"){
     $("stack").innerHTML = list.map(c=>{ const u=cardUsage(c);
-      const right = c.tipo==="TDC" ? `<span class="num"><b>${fmt0(u.used)}</b> <span class="sub">/ ${fmt0(c.limite||0)}</span></span>` : `<b class="num">${c.saldo!=null?fmt0(c.saldo):"—"}</b>`;
+      const right = c.tipo==="TDC" ? `<span class="num"><b>${fmt0(u.used)}</b> <span class="sub">/ ${fmt0(c.limite||0)}</span></span>` : `<b class="num">${tddSaldo(c)!=null?fmt0(tddSaldo(c)):"—"}</b>`;
       return `<button class="lrow" data-card="${esc(c.id)}"><span class="lsw" style="background:${esc(c.fondo||c.color)}"></span><span class="lname">${esc(cname(c))}${c.congelada?' <span class="chipst under">Congelada</span>':""}</span>${right}</button>`;}).join("")
       || `<p class="empty">No hay tarjetas con este filtro.</p>`;
   } else
@@ -672,8 +674,8 @@ function renderStack(){
     $("w-foot").innerHTML = `<div class="kv num"><div><span>Tarjetas de crédito</span><b>${all.length} <span class="sub">(${all.filter(isUso).length} en uso)</span></b></div>
       <div><span>Línea total</span><b>${fmt0(lin)}</b></div><div><span>Disponible total</span><b>${fmt0(lin-used)}</b></div></div>`;
   } else {
-    const s = all.reduce((a,c)=>a+(+c.saldo||0),0);
-    $("w-foot").innerHTML = `<div class="kv num"><div><span>Cuentas de débito</span><b>${all.length}</b></div><div><span>Saldo capturado</span><b>${fmt0(s)}</b></div><div><span>Sin saldo capturado</span><b>${all.filter(c=>c.saldo==null).length}</b></div></div>`;
+    const s = all.reduce((a,c)=>a+(+tddSaldo(c)||0),0);
+    $("w-foot").innerHTML = `<div class="kv num"><div><span>Cuentas de débito</span><b>${all.length}</b></div><div><span>Saldo capturado</span><b>${fmt0(s)}</b></div><div><span>Sin saldo capturado</span><b>${all.filter(c=>tddSaldo(c)==null).length}</b></div></div>`;
   }
 }
 
@@ -755,7 +757,7 @@ function renderDetail(){
       <div class="actions" style="align-items:flex-end"><button class="btn primary" type="submit">Crear</button><button class="btn" type="button" data-act="cancel">Cancelar</button></div></form>`;
     h += `<div class="sub" style="margin-bottom:-6px">↑ más antiguos · más recientes ↓</div><div class="plist" id="plist">${per.map(periodTab).join("") || `<p class="empty">${all.length?"No hay periodos con este filtro.":"Sin periodos. Crea uno con “Nuevo periodo”."}</p>`}</div>`;
   } else {
-    h += `<div class="info"><div><span>Saldo</span><b class="num">${c.saldo!=null?fmt(c.saldo):"Sin capturar"}</b></div><div><span>Uso</span><b>${esc(c.uso||"—")}</b></div><div><span>Beneficio</span><b>${esc(c.beneficio||"—")}</b></div>
+    h += `<div class="info"><div><span>Saldo</span><b class="num">${tddSaldo(c)!=null?fmt(tddSaldo(c)):"Sin capturar"}</b></div><div><span>Uso</span><b>${esc(c.uso||"—")}</b></div><div><span>Beneficio</span><b>${esc(c.beneficio||"—")}</b></div>
       <div><span>Contactless</span><b>${c.contactless==null?"—":c.contactless?"Sí":"No"}</b></div><div><span>Congelada</span><b>${c.congelada?"Sí":"No"}</b></div><div><span>Estado</span><b>${isUso(c)?"En uso":"Sin uso"}</b></div></div>
       ${apartadosHTML(c)}
       <div class="actions"><button class="btn sm" data-act="editcard">${S.editing?"Cerrar edición":"Editar cuenta"}</button></div>`;
@@ -767,6 +769,7 @@ function renderDetail(){
   if (nl){ nl.scrollTop = S.scrollBottom ? nl.scrollHeight : keepL; S.scrollBottom = false; }
 }
 function apartadosHTML(c){
+  if (tddCtas(c).length) return tddCtasHTML(c);
   const ap = c.apartados||[]; if (!ap.length) return "";
   const sum = ap.reduce((a,x)=>a+(+x.saldo||0),0), libre = (+c.saldo||0)-sum;
   return `<div><div class="sec-head"><b>Apartados</b><span class="sub num">${fmt(sum)} apartado · ${fmt(libre)} sin asignar</span></div>
@@ -783,7 +786,7 @@ function cardForm(c){
        <label for="e-pni">Pago para no generar intereses<input id="e-pni" type="number" step="0.01" placeholder="Opcional" value="${c.pagoNoInt??""}"></label>
        <label for="e-corte">Última fecha de corte<input id="e-corte" type="date" value="${esc(c.fechaCorte||"")}"></label>
        <label for="e-flim">Última fecha límite de pago<input id="e-flim" type="date" value="${esc(c.fechaLimite||"")}"></label>`
-    : `<label for="e-saldo">Saldo total de la cuenta<input id="e-saldo" type="number" step="0.01" value="${c.saldo??""}"></label>
+    : tddLinkHTML(c) + `<label for="e-saldo">Saldo manual (solo si no eliges cuentas arriba)<input id="e-saldo" type="number" step="0.01" value="${c.saldo??""}"></label>
        <div class="full"><div class="sub">Apartados / cajitas dentro de esta cuenta</div><table class="bt"><tbody>${(S.apDraft||[]).map((a,i)=>`<tr><td><input id="ap-n-${i}" aria-label="Nombre del apartado" data-ap="${i}" data-k="nombre" value="${esc(a.nombre)}"></td><td style="width:110px"><input id="ap-s-${i}" aria-label="Saldo del apartado" type="number" step="0.01" data-ap="${i}" data-k="saldo" value="${a.saldo??""}"></td><td class="x"><button type="button" class="iconbtn" data-act="delap" data-i="${i}" aria-label="Quitar apartado">×</button></td></tr>`).join("")}</tbody></table>
        <button type="button" class="btn sm" data-act="addap">+ Agregar apartado</button></div>`) +
     `<label for="e-ben">Beneficio<input id="e-ben" maxlength="40" value="${esc(c.beneficio||"")}"></label>
@@ -1113,7 +1116,7 @@ document.addEventListener("submit", async e=>{
       upd.fechaCorte=$("e-corte").value||null; upd.fechaLimite=$("e-flim").value||null;
       if (upd.limite!=null && c.limite!=null && upd.limite!==c.limite)
         upd.historialLimite = [...(c.historialLimite||[]).map(x=>({...x})), {fecha:todayISO, de:c.limite, a:upd.limite}];
-    } else { upd.saldo = num("e-saldo"); readAp(); upd.apartados = (S.apDraft||[]).filter(x=>String(x.nombre||"").trim()).map(x=>({nombre:String(x.nombre).trim(), saldo:+x.saldo||0})); }
+    } else { upd.saldo = num("e-saldo"); if (document.querySelector("[data-tddcta]")) upd.ctas = [...document.querySelectorAll("[data-tddcta]:checked")].map(x=>x.dataset.tddcta); readAp(); upd.apartados = (S.apDraft||[]).filter(x=>String(x.nombre||"").trim()).map(x=>({nombre:String(x.nombre).trim(), saldo:+x.saldo||0})); }
     await save(()=>db.doc("cards/"+c.id).update(upd));
   }
   const keepOpen = S.openP; resetForms(); S.openP = keepOpen; renderDetail();
@@ -1744,6 +1747,29 @@ document.addEventListener("submit", async e=>{
     await save(()=>db.doc("config/cats").set(cfg)); S.catEdit=null; renderCategorias(); return;
   }
 }, true);
+
+/* ---- Tarjetas de débito ligadas a Cuentas ---- */
+function tddNorm(t){ return String(t||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,""); }
+function tddCtas(c){
+  const list = (S.ctas?.list)||[]; if (!list.length || c.tipo==="TDC") return [];
+  if (Array.isArray(c.ctas)) return list.filter(x=>c.ctas.includes(x.n));
+  const nm = tddNorm(cname(c)+" "+(c.banco||""));
+  if (/mercado ?pago|\bmp\b/.test(nm)) return list.filter(x=>/^mp\b|mercado ?pago/.test(tddNorm(x.n)));
+  if (/open ?bank/.test(nm)) return list.filter(x=>/^open ?bank|^open\b/.test(tddNorm(x.n)));
+  const w = (nm.match(/[a-z]{3,}/g)||[]).filter(t=>!["tarjeta","debito","cuenta","nomina","card"].includes(t))[0];
+  return w ? list.filter(x=>{ const n = tddNorm(x.n); return new RegExp("\\b"+w+"\\b").test(n) && !/deuda/.test(n); }) : [];
+}
+function tddSaldo(c){ const l = tddCtas(c); return l.length ? Math.round(l.reduce((a,x)=>a+ctaSaldo(x),0)*100)/100 : (c.saldo!=null ? +c.saldo : null); }
+function tddLinkHTML(c){
+  const list = (S.ctas?.list)||[]; if (!list.length) return "";
+  const on = new Set(tddCtas(c).map(x=>x.n));
+  return `<div class="full"><div class="sub">Cuentas que forman esta tarjeta (su saldo se calcula solo desde Cuentas)</div><div class="tdd-ctas">${list.map((x,i)=>`<label class="chk" for="e-tc-${i}"><input type="checkbox" id="e-tc-${i}" data-tddcta="${esc(x.n)}" ${on.has(x.n)?"checked":""}> ${esc(x.n)} <span class="sub num">${fmt(ctaSaldo(x))}</span></label>`).join("")}</div></div>`;
+}
+function tddCtasHTML(c){
+  const l = tddCtas(c); if (!l.length) return "";
+  return `<div><div class="sec-head"><b>Cuentas</b><span class="sub num">${fmt(tddSaldo(c))} en total · se actualiza con Cuentas</span></div>
+    <table class="num"><tbody>${l.filter(x=>Math.abs(ctaSaldo(x))>=0.005).map(x=>`<tr><td>${esc(x.n)}</td><td>${fmt(ctaSaldo(x))}</td></tr>`).join("")}</tbody></table>${l.some(x=>Math.abs(ctaSaldo(x))<0.005)?`<div class="sub">${l.filter(x=>Math.abs(ctaSaldo(x))<0.005).length} cuentas más en $0.00</div>`:""}</div>`;
+}
 
 /* ================= Registro de transacción (como en tu app) ================= */
 const TK_BASE = [["fv","Frutas y verduras","#2fbf4f"],["prot","Proteína","#c0392b"],["lac","Lácteos","#4d8cf0"],["aba","Abarrotes y granos","#b07d2b"],["beb","Bebidas","#2bb5c4"],["snk","Snacks, dulces y pan","#e67e22"],["limp","Limpieza","#16a085"],["hog","Hogar","#7f8c8d"],["hig","Higiene personal","#9b59b6"],["otro","Otro","#9aa1ad"]];
