@@ -78,3 +78,6 @@ app=rep(app,'''function apartadosHTML(c){
   const ap = c.apartados||[]; if (!ap.length) return "";''')
 app=rep(app,': `<label for="e-saldo">Saldo total de la cuenta<input id="e-saldo" type="number" step="0.01" value="${c.saldo??""}"></label>',': tddLinkHTML(c) + `<label for="e-saldo">Saldo manual (solo si no eliges cuentas arriba)<input id="e-saldo" type="number" step="0.01" value="${c.saldo??""}"></label>')
 app=rep(app,'} else { upd.saldo = num("e-saldo"); readAp();','} else { upd.saldo = num("e-saldo"); if (document.querySelector("[data-tddcta]")) upd.ctas = [...document.querySelectorAll("[data-tddcta]:checked")].map(x=>x.dataset.tddcta); readAp();')
+# --- Papelera: cuentas eliminadas ---
+app=rep(app,'    const desc = t.tipo==="trf" ?','    const desc = t.tipo==="cta" ? `Cuenta <b>${esc(d.n)}</b> <span class="sub">(sus registros siguen en tu historial)</span>` : t.tipo==="trf" ?')
+app=rep(app,'        if (t.tipo==="trf") await writeTrfMonth(','        if (t.tipo==="cta"){ const l=((S.ctas?.list)||[]).map(x=>({...x})); if (!l.some(x=>x.n===t.data.n)) l.splice(Math.min(t.i??l.length, l.length), 0, t.data); await db.doc("config/cuentas").set({...(S.ctas||{}), list:l}); }\n        else if (t.tipo==="trf") await writeTrfMonth(')

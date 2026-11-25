@@ -36,11 +36,12 @@ function ctaColor(n){
 }
 function ctaIcon(n){ const s=n.toUpperCase(); const k = s.startsWith("EFECTIVO")?"cash":s.includes("DEUDA")?"building-bank":(s.includes("AHORRO")||s.includes("EMERGENCIA")||s.includes("MAESTR"))?"pig-money":s.startsWith("GBM")||s.includes("PPR")?"chart-line":s.includes("SALUD")?"heart-rate-monitor":"wallet"; return `<i class="ti ti-${k}" aria-hidden="true"></i>`; }
 function trfItems(){ const out=[]; Object.values(S.trfDb||{}).forEach(d=>(d.items||[]).forEach(x=>out.push(x))); return out; }
+function ctaIs(c){ const al = c.alias||[]; return v => v===c.n || (al.length>0 && al.includes(v)); }
 function ctaSaldo(c){
-  let s = +c.s||0;
-  allMonths().forEach(ym=>{ if (ym < BASE_CTAS.slice(0,7)) return; monthItems(ym).forEach(x=>{ if (x.f>BASE_CTAS && x.cta===c.n && !x.tdc) s += x.t==="i" ? x.m : -x.m; }); });
-  S.periods.forEach(p=>(p.pagos||[]).forEach(g=>{ if (g.f>BASE_CTAS && g.cta===c.n) s -= +g.m||0; }));
-  trfItems().forEach(x=>{ if (x.f>BASE_CTAS){ if (x.de===c.n) s -= x.m; if (x.a===c.n) s += x.m; } });
+  let s = +c.s||0; const es = ctaIs(c);
+  allMonths().forEach(ym=>{ if (ym < BASE_CTAS.slice(0,7)) return; monthItems(ym).forEach(x=>{ if (x.f>BASE_CTAS && es(x.cta) && !x.tdc) s += x.t==="i" ? x.m : -x.m; }); });
+  S.periods.forEach(p=>(p.pagos||[]).forEach(g=>{ if (g.f>BASE_CTAS && es(g.cta)) s -= +g.m||0; }));
+  trfItems().forEach(x=>{ if (x.f>BASE_CTAS){ if (es(x.de)) s -= x.m; if (es(x.a)) s += x.m; } });
   return Math.round(s*100)/100;
 }
 function cuentasTotals(){
@@ -76,7 +77,7 @@ function ctaForm(x){
     <label for="ct-s">Saldo actual<input id="ct-s" type="number" step="0.01" value="${x.nuevo?"":ctaSaldo(x)}"></label>
     <label class="full" for="ct-en">¿Dónde está el dinero?<select id="ct-en">${ctaEnOpts(x.nuevo?"":ctaEn(x))}</select></label>
     <label class="chk" for="ct-t" style="align-self:end"><input type="checkbox" id="ct-t" ${x.t?"checked":""}> Suma al total</label>
-    <div class="actions full"><button class="btn primary" type="submit">Guardar</button><button class="btn" type="button" data-act="ctacancel">Cancelar</button>${x.nuevo?"":`<button class="btn sm" type="button" data-act="ctaup">↑</button><button class="btn sm" type="button" data-act="ctadown">↓</button><button class="btn danger" type="button" data-act="ctadel">${S.ctaConfirm?"Confirmar eliminar":"Eliminar"}</button>`}</div></form>`;
+    <div class="actions full"><button class="btn primary" type="submit">Guardar</button><button class="btn" type="button" data-act="ctacancel">Cancelar</button>${x.nuevo?"":`<button class="btn sm" type="button" data-act="ctaup">↑</button><button class="btn sm" type="button" data-act="ctadown">↓</button>${S.ctaConfirm?"":`<button class="btn danger" type="button" data-act="ctadel">Eliminar</button>`}`}</div>${!x.nuevo && S.ctaConfirm ? ctaDelHTML(x) : ""}</form>`;
 }
 function trfForm(x){
   const opts = ctaNames().map(n=>`<option value="${esc(n)}">`).join("");
@@ -195,7 +196,7 @@ document.addEventListener("click", async e=>{
   const nav = e.target.closest("[data-nav]"); if (nav && !$("drawer").hidden) openDrawer(false);
   const a = e.target.closest("[data-act]"); if (!a) return;
   const act = a.dataset.act;
-  const mine = ["drawer","drawerclose","theme","trfhist","trfback","trfnew","trfedit","trfcancel","trfdel","ctaedit","ctaubi","ctanew","ctacancel","ctadel","ctaup","ctadown","grt","grp","grsel","ctt","catedit","catnew","catcancel","catico","catcol"];
+  const mine = ["drawer","drawerclose","theme","trfhist","trfback","trfnew","trfedit","trfcancel","trfdel","ctaedit","ctaubi","ctadelmove","ctadelno","ctanew","ctacancel","ctadel","ctaup","ctadown","grt","grp","grsel","ctt","catedit","catnew","catcancel","catico","catcol"];
   if (!mine.includes(act)) return;
   e.stopImmediatePropagation();
   const i = a.dataset.i!=null ? +a.dataset.i : null;
@@ -217,7 +218,9 @@ document.addEventListener("click", async e=>{
     case "ctacancel": S.ctaEdit=null; renderCuentas(); return;
     case "ctaup": case "ctadown": { const l=S.ctas.list.map(x=>({...x})), k=S.ctaEdit.i, j=act==="ctaup"?k-1:k+1; if (j<0||j>=l.length) return; [l[k],l[j]]=[l[j],l[k]]; S.ctaEdit.i=j; if (db) await save(()=>db.doc("config/cuentas").set({...S.ctas, list:l})); return; }
     case "ctadel": { if (!S.ctaConfirm){ S.ctaConfirm=true; renderCuentas(); return; }
-      const l=S.ctas.list.filter((_,k)=>k!==S.ctaEdit.i).map(x=>({...x})); if (db) await save(()=>db.doc("config/cuentas").set({...S.ctas, list:l})); S.ctaEdit=null; return; }
+      await ctaBorrar(S.ctaEdit, null); return; }
+    case "ctadelmove": { const dest = $("ctd-dest")?.value; if (!dest){ $("ctd-dest")?.focus(); return; } await ctaBorrar(S.ctaEdit, dest); return; }
+    case "ctadelno": S.ctaConfirm=false; renderCuentas(); return;
     case "grt": S.grT=a.dataset.v; renderGraficos(); return;
     case "grp": S.grP=a.dataset.v; S.grSel=null; S.grScrollEnd=true; renderGraficos(); return;
     case "grsel": S.grSel=i; { const sc=$("gscroll"), keep=sc?sc.scrollLeft:0; renderGraficos(); const sc2=$("gscroll"); if (sc2) sc2.scrollLeft=keep; } return;
@@ -249,7 +252,7 @@ document.addEventListener("submit", async e=>{
     const n=$("ct-n").value.trim(), deseado=parseFloat($("ct-s").value||"0"), t=$("ct-t").checked; if (!n) return;
     const en=$("ct-en")?$("ct-en").value:undefined;
     if (x.nuevo) l.push({n, s:deseado||0, t, ...(en!=null?{en}:{})});
-    else { const old=l[x.i]; const actual=ctaSaldo(old); l[x.i]={...old, n, t, s:Math.round(((+old.s||0)+(deseado-actual))*100)/100}; if (en!=null) l[x.i].en=en; }
+    else { const old=l[x.i]; const actual=ctaSaldo(old); l[x.i]={...old, n, t, s:Math.round(((+old.s||0)+(deseado-actual))*100)/100}; if (en!=null) l[x.i].en=en; if (n!==old.n) l[x.i].alias=[...new Set([...(old.alias||[]), old.n])]; }
     await save(()=>db.doc("config/cuentas").set({...(S.ctas||{}), list:l})); S.ctaEdit=null; renderCuentas(); return;
   }
   if (k==="cat"){
@@ -298,10 +301,10 @@ function tddCtasHTML(c){
 
 /* ---- Historial por cuenta ---- */
 function ctaLedger(c){
-  const rows = [];
-  allMonths().forEach(ym=>{ if (ym < BASE_CTAS.slice(0,7)) return; monthItems(ym).forEach(x=>{ if (x.f>BASE_CTAS && x.cta===c.n && !x.tdc) rows.push({f:x.f, d:(x.n||x.cat)+(x.n?` · ${x.cat}`:""), m: x.t==="i" ? +x.m : -x.m, k:x.t==="i"?"Ingreso":"Gasto"}); }); });
-  S.periods.forEach(p=>(p.pagos||[]).forEach(g=>{ if (g.f>BASE_CTAS && g.cta===c.n) rows.push({f:g.f, d:"Pago "+cname(card(p.card)||{nombre:p.card})+` (vence ${dShort(p.due)})`, m:-(+g.m||0), k:"Pago TDC"}); }));
-  trfItems().forEach(x=>{ if (x.f>BASE_CTAS){ if (x.de===c.n) rows.push({f:x.f, d:"Transferencia a "+x.a, m:-x.m, k:"Transferencia"}); if (x.a===c.n) rows.push({f:x.f, d:"Transferencia de "+x.de, m:+x.m, k:"Transferencia"}); } });
+  const rows = [], es = ctaIs(c);
+  allMonths().forEach(ym=>{ if (ym < BASE_CTAS.slice(0,7)) return; monthItems(ym).forEach(x=>{ if (x.f>BASE_CTAS && es(x.cta) && !x.tdc) rows.push({f:x.f, d:(x.n||x.cat)+(x.n?` · ${x.cat}`:""), m: x.t==="i" ? +x.m : -x.m, k:x.t==="i"?"Ingreso":"Gasto"}); }); });
+  S.periods.forEach(p=>(p.pagos||[]).forEach(g=>{ if (g.f>BASE_CTAS && es(g.cta)) rows.push({f:g.f, d:"Pago "+cname(card(p.card)||{nombre:p.card})+` (vence ${dShort(p.due)})`, m:-(+g.m||0), k:"Pago TDC"}); }));
+  trfItems().forEach(x=>{ if (x.f>BASE_CTAS){ if (es(x.de)) rows.push({f:x.f, d:"Transferencia a "+x.a, m:-x.m, k:"Transferencia"}); if (es(x.a)) rows.push({f:x.f, d:"Transferencia de "+x.de, m:+x.m, k:"Transferencia"}); } });
   rows.sort((a,b)=>a.f.localeCompare(b.f)); let s = +c.s||0; rows.forEach(r=>{ s = Math.round((s+r.m)*100)/100; r.s = s; });
   return rows;
 }
@@ -328,3 +331,32 @@ document.addEventListener("change", async e=>{
 
 /* El historial de transferencias comparte la navegación de fechas con Inicio: refrescarlo también */
 { const rm = renderMovs; renderMovs = function(){ rm(); if (S.trfView && $("cuentas")) renderTrfHist(); }; }
+
+/* ---- Eliminar cuenta sin perder registros ---- */
+function ctaDelHTML(x){
+  const c = S.ctas.list[x.i]; if (!c) return "";
+  const v = ctaSaldo(c), otras = S.ctas.list.filter((_,k)=>k!==x.i);
+  let h = `<div class="full ctd"><p class="ctd-info">🛈 Borrar esta cuenta <b>no eliminará</b> los gastos, ingresos, transferencias ni pagos ya registrados con ella: conservan su nombre y siguen en tu historial. Si te equivocas, la restauras desde la Papelera (al final de esta pantalla).</p>`;
+  if (Math.abs(v) >= 0.005){
+    h += `<div class="tx-warn" role="alert">⚠️ <b>${esc(c.n)}</b> tiene <b class="num">${fmt(v)}</b>. Si la borras así, ese dinero dejaría de contarse. ¿Lo mueves a otra cuenta antes?
+      <label for="ctd-dest" style="display:block;margin-top:8px">Mover ${v<0?"(cubrir el negativo) desde":"a"}<select id="ctd-dest"><option value="">Elige una cuenta…</option>${otras.map(o=>`<option value="${esc(o.n)}">${esc(o.n)} · ${fmt(ctaSaldo(o))}</option>`).join("")}</select></label>
+      <div class="actions"><button type="button" class="btn sm primary" data-act="ctadelmove">Mover ${fmt(Math.abs(v))} y eliminar</button><button type="button" class="btn sm" data-act="ctadelno">No eliminar</button></div>
+      <p class="sub" style="margin:6px 0 0">Si el saldo está mal y en realidad es $0, corrige “Saldo actual” arriba y guarda antes de eliminar.</p></div>`;
+  } else h += `<div class="actions"><button type="button" class="btn sm danger" data-act="ctadel">Sí, eliminar</button><button type="button" class="btn sm" data-act="ctadelno">No eliminar</button></div>`;
+  return h + `</div>`;
+}
+async function ctaBorrar(x, dest){
+  const c = S.ctas.list[x.i]; if (!c || !db) return;
+  const v = ctaSaldo(c);
+  if (Math.abs(v) >= 0.005 && !dest) { renderCuentas(); return; }
+  const l = S.ctas.list.filter((_,k)=>k!==x.i).map(o=>({...o}));
+  await save(async()=>{
+    if (dest && Math.abs(v) >= 0.005){
+      const ym = todayISO.slice(0,7), it = {id:"t"+Date.now().toString(36)+Math.random().toString(36).slice(2,5), de: v>0?c.n:dest, a: v>0?dest:c.n, m: Math.round(Math.abs(v)*100)/100, f: todayISO, n: "Saldo al eliminar la cuenta "+c.n};
+      await writeTrfMonth(ym, [...trfMonth(ym), it].sort((a,b)=>a.f.localeCompare(b.f)));
+    }
+    await toTrash({tipo:"cta", i:x.i, data:{...c}});
+    await db.doc("config/cuentas").set({...S.ctas, list:l});
+  });
+  S.ctaEdit = null; S.ctaConfirm = false; renderCuentas();
+}
