@@ -447,6 +447,11 @@ html:root.th-dark.th-green{--bg:#141a0d; --surface:#222a1d; --ink:#eef3ea; --mut
 .ubi-r select{grid-column:1/-1;font-size:13px;padding:4px 6px}
 .ctd{display:flex;flex-direction:column;gap:8px}.ctd-info{margin:0;font-size:13px;background:var(--bg);border-radius:10px;padding:8px 10px}
 .ct-tip{margin:4px 0 0;font-size:12px}
+.ct-tipw{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:4px}.ct-tipw .ct-tip{margin:0}
+.ct-eye,.ct-fold{flex:none;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--surface,transparent);color:var(--ink);display:grid;place-items:center;cursor:pointer;font-size:19px}
+.ct-eye[aria-pressed=true]{color:var(--accent);border-color:var(--accent)}
+.ct-gh{align-items:center}.ct-gh>span:first-child{flex:1;min-width:0}.ct-fold{width:32px;height:32px;font-size:17px}
+.ct-grp.coll>.ct-list{display:none}
 .ct-grp{margin:10px 0 0;border-radius:14px;transition:box-shadow .15s}
 .ct-gh{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:8px 4px 6px;font-size:18px;font-weight:700}
 .ct-gh .num{font-size:16px}
@@ -1584,7 +1589,7 @@ function renderCuentas(){
   const box = $("cuentas"); if (!box) return;
   const list = (S.ctas?.list)||[], tt = cuentasTotals();
   if (S.trfView){ renderTrfHist(); return; }
-  let h = `<div class="ct-head"><span class="sub">Total</span><b class="bal-big num">${fmt(tt.total)}</b><span class="sub num">Todas las cuentas: ${fmt(tt.todas)}</span></div>
+  let h = `<div class="ct-head"><span class="sub">Total</span><b class="bal-big num">${mny(tt.total)}</b><span class="sub num">Todas las cuentas: ${mny(tt.todas)}</span></div>
     <div class="ct-acts"><button class="ct-act" data-act="trfhist"><span>🕘</span>Historial de transferencias</button><button class="ct-act" data-act="trfnew"><span>⇄</span>Nueva transferencia</button></div>`;
   if (S.trfEdit) h += trfForm(S.trfEdit);
   if (S.ctaEdit && S.ctaEdit.nuevo) h += ctaForm(S.ctaEdit);
@@ -1597,14 +1602,14 @@ function renderCuentas(){
     box.innerHTML = h; return;
   }
   const row = (c,i)=>{ const v=ctaSaldo(c);
-    return `<button class="ct-row" data-act="ctaedit" data-i="${i}"><span class="ct-ic" style="background:${ctaColor(c.n)}">${ctaIcon(c.n)}</span><span class="ct-n">${esc(c.n)}</span>${c.t?"":'<span class="ct-hid" title="No suma al total" aria-label="No suma al total">⊘</span>'}<span class="num ct-v${v<0?" neg":""}">${fmt(v)}</span></button>`; };
+    return `<button class="ct-row" data-act="ctaedit" data-i="${i}"><span class="ct-ic" style="background:${ctaColor(c.n)}">${ctaIcon(c.n)}</span><span class="ct-n">${esc(c.n)}</span>${c.t?"":'<span class="ct-hid" title="No suma al total" aria-label="No suma al total">⊘</span>'}<span class="num ct-v${v<0?" neg":""}">${mny(v)}</span></button>`; };
   const rowW = (c,i)=>`<div class="ct-rw${S.ctaSel===i?" sel":""}">${row(c,i)}${S.ctaSel===i?`<button type="button" class="ct-ed" data-act="ctaedit" data-i="${i}" data-go="1" aria-label="Editar ${esc(c.n)}">✏️</button><button type="button" class="ct-x" data-act="ctax" data-i="${i}" aria-label="Eliminar ${esc(c.n)}">×</button>`:""}</div>${S.ctaEdit && !S.ctaEdit.nuevo && S.ctaEdit.i===i ? `<div class="ct-delin" id="ct-inl">${S.ctaDelIn ? ctaDelHTML(S.ctaEdit) : ctaForm(S.ctaEdit) + (S.ctaLed ? ctaLedgerHTML(S.ctaEdit) : "")}</div>` : ""}`;
   if (S.ctaMove) h += ctaMoveHTML();
-  h += `<p class="sub ct-tip">Mantén presionada una cuenta y arrástrala para cambiarla de lugar.</p>`;
+  h += `<div class="ct-tipw"><p class="sub ct-tip">Mantén presionada una cuenta y arrástrala para cambiarla de lugar.</p><button type="button" class="ct-eye" data-act="ctaeye" aria-pressed="${!!ctaPref().hide}" aria-label="${ctaPref().hide?"Mostrar montos":"Ocultar montos"}"><i class="ti ti-${ctaPref().hide?"eye-off":"eye"}"></i></button></div>`;
   h += [...tddCards().map(c=>c.id), "efectivo", ""].map(g=>{
     const its = list.map((c,i)=>({c,i})).filter(o=>ctaEn(o.c)===g); if (!its.length && g==="") return "";
     const tot = its.reduce((a,o)=>a+(o.c.t?ctaSaldo(o.c):0),0), todas = its.reduce((a,o)=>a+ctaSaldo(o.c),0);
-    return `<div class="ct-grp" data-g="${esc(g)}"><div class="ct-gh"><span>${g==="efectivo"?"💵":g?"💳":"❔"} ${esc(ctaEnName(g))}</span><span class="ct-gt"><span class="num">${fmt(tot)}</span>${Math.abs(todas-tot)>=0.005?`<small class="num">con ⊘: ${fmt(todas)}</small>`:""}</span></div><div class="ct-list">${its.map(o=>rowW(o.c,o.i)).join("") || '<p class="sub ct-empty">Suelta aquí una cuenta</p>'}</div></div>`;
+    return `<div class="ct-grp${ctaPref().coll.includes(g)?" coll":""}" data-g="${esc(g)}"><div class="ct-gh"><span>${g==="efectivo"?"💵":g?"💳":"❔"} ${esc(ctaEnName(g))}</span><span class="ct-gt"><span class="num">${mny(tot)}</span>${Math.abs(todas-tot)>=0.005?`<small class="num">con ⊘: ${mny(todas)}</small>`:""}</span><button type="button" class="ct-fold" data-act="ctafold" data-g="${esc(g)}" aria-expanded="${!ctaPref().coll.includes(g)}" aria-label="${ctaPref().coll.includes(g)?"Mostrar":"Ocultar"} cuentas de ${esc(ctaEnName(g))}"><i class="ti ti-chevron-${ctaPref().coll.includes(g)?"down":"up"}"></i></button></div><div class="ct-list">${its.map(o=>rowW(o.c,o.i)).join("") || '<p class="sub ct-empty">Suelta aquí una cuenta</p>'}</div></div>`;
   }).join("") + `
     <div class="actions"><button class="btn sm" data-act="ctanew">+ Agregar cuenta</button></div>
     <p class="sub" style="margin:0">⊘ = no suma al total (igual que el ojo tachado de tu app). Saldos al ${dLong(BASE_CTAS)}; desde ahí se actualizan con tus movimientos y transferencias.</p>`;
@@ -1735,7 +1740,7 @@ document.addEventListener("click", async e=>{
   const nav = e.target.closest("[data-nav]"); if (nav && !$("drawer").hidden) openDrawer(false);
   const a = e.target.closest("[data-act]"); if (!a) return;
   const act = a.dataset.act;
-  const mine = ["drawer","drawerclose","theme","trfhist","trfback","trfnew","trfedit","trfcancel","trfdel","ctaedit","ctax","ctaled","ctaubi","ctadelmove","ctadelno","ctanew","ctacancel","ctadel","ctaup","ctadown","grt","grp","grsel","ctt","catedit","catnew","catcancel","catico","catcol"];
+  const mine = ["drawer","drawerclose","theme","trfhist","trfback","trfnew","trfedit","trfcancel","trfdel","ctaedit","ctax","ctaled","ctaeye","ctafold","ctaubi","ctadelmove","ctadelno","ctanew","ctacancel","ctadel","ctaup","ctadown","grt","grp","grsel","ctt","catedit","catnew","catcancel","catico","catcol"];
   if (!mine.includes(act)) return;
   e.stopImmediatePropagation();
   const i = a.dataset.i!=null ? +a.dataset.i : null;
@@ -1752,6 +1757,8 @@ document.addEventListener("click", async e=>{
       const x=S.trfEdit, ym=x.f.slice(0,7); if (db) await save(async()=>{ await toTrash({tipo:"trf", ym, data:{...x}}); await writeTrfMonth(ym, trfMonth(ym).filter(y=>y.id!==x.id)); });
       S.trfEdit=null; S.trfConfirm=false; return; }
     case "ctaubi": S.ctaUbi=!S.ctaUbi; S.ctaEdit=null; renderCuentas(); return;
+    case "ctaeye": { const p=ctaPref(); p.hide=!p.hide; ctaPrefSet(p); renderCuentas(); return; }
+    case "ctafold": { const p=ctaPref(), g=a.dataset.g; p.coll = p.coll.includes(g) ? p.coll.filter(x=>x!==g) : [...p.coll, g]; ctaPrefSet(p); renderCuentas(); return; }
     case "ctaled": S.ctaLed=!S.ctaLed; renderCuentas(); return;
     case "ctax": S.ctaSel=null; S.ctaEdit={...S.ctas.list[i], i}; S.ctaConfirm=true; S.ctaDelIn=true; renderCuentas(); return;
     case "ctaedit": if (!a.dataset.go && S.ctaSel!==i){ S.ctaSel=i; S.ctaDelIn=false; S.ctaEdit=null; renderCuentas(); return; }
@@ -1965,6 +1972,11 @@ async function ctaReorder(from, toIdx, en){
 }
 
 document.addEventListener("click", e=>{ if (S.ctaSel==null || e.target.closest?.("#cuentas .ct-rw")) return; S.ctaSel=null; if ($("cuentas")) renderCuentas(); });
+
+/* ---- Preferencias de vista de Cuentas (en este dispositivo) ---- */
+function ctaPref(){ try{ const p = JSON.parse(localStorage.getItem("mf-ctavista")||"{}"); return {hide:!!p.hide, coll:Array.isArray(p.coll)?p.coll:[]}; }catch(e){ return {hide:false, coll:[]}; } }
+function ctaPrefSet(p){ try{ localStorage.setItem("mf-ctavista", JSON.stringify(p)); }catch(e){} }
+function mny(v){ return ctaPref().hide ? "$ •••••" : fmt(v); }
 
 /* ================= Registro de transacción (como en tu app) ================= */
 const TK_BASE = [["fv","Frutas y verduras","#2fbf4f"],["prot","Proteína","#c0392b"],["lac","Lácteos","#4d8cf0"],["aba","Abarrotes y granos","#b07d2b"],["beb","Bebidas","#2bb5c4"],["snk","Snacks, dulces y pan","#e67e22"],["limp","Limpieza","#16a085"],["hog","Hogar","#7f8c8d"],["hig","Higiene personal","#9b59b6"],["otro","Otro","#9aa1ad"]];
