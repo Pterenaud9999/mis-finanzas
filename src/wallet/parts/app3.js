@@ -454,6 +454,47 @@ async function addTipo(nombre){
 /* ================= Pagos de periodos TDC ================= */
 const pagado = p => r2((p.pagos||[]).reduce((a,g)=>a+(+g.m||0),0));
 const faltante = p => p.status==="pagado" ? 0 : Math.max(0, r2(total(p) - pagado(p)));
+/* ---- Conceptos de la Wallet que no están en Inicio ---- */
+const iniNorm = t => String(t||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/^\d+\/\d+\s+/,"").replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();
+const INI_KW = [[/rappi|uber ?eats|didi ?food|restaurant|cafe|starbucks|pizza|tacos|burger|kfc|mcdonald/,"Alimentación"],[/oxxo|chedraui|walmart|soriana|sams|costco|bodega|super|mega|aurrera|7 ?eleven/,"Despensa"],[/uber|didi|cabify|taxi/,"Taxi"],[/gasolin|pemex|shell|mobil|g500|oxxo gas/,"Gasolina"],[/amazon|mercado ?libre|shein|temu|aliexpress|liverpool online/,"Compras online"],[/spotify/,"Spotify"],[/netflix|disney|hbo|max|prime video|youtube|vix|apple tv/,"Streaming"],[/farmacia|doctor|hospital|laboratorio|similares|guadalajara/,"Salud"],[/telcel|at t|izzi|totalplay|telmex|megacable/,"Internet"],[/vuelo|aeromexico|volaris|viva ?aerobus/,"Viaje"],[/hotel|airbnb|booking/,"Hospedaje"],[/\bado\b|autobus|tren maya/,"Transporte"],[/cine|cinepolis|cinemex/,"Cine"]];
+function iniGuess(concepto){
+  const k = iniNorm(concepto); if (!k) return "";
+  const ms = allMonths().slice(-36).reverse();
+  for (const ym of ms){ const hit = monthItems(ym).slice().reverse().find(x=>{ if (x.t!=="g" || !x.cat) return false; const n = iniNorm(x.n); return n && (n===k || (n.length>=4 && k.includes(n)) || (k.length>=4 && n.includes(k))); }); if (hit) return hit.cat; }
+  const cats = catList("g"), kw = INI_KW.find(([re,c])=>re.test(k) && cats.includes(c));
+  return kw ? kw[1] : "";
+}
+const iniCand = it => !it.movId && !it.adelanto && +it.monto>0;
+function iniState(p, idxs){
+  const st = (S.iniSt = S.iniSt||{})[p.id] = S.iniSt[p.id]||{};
+  idxs.forEach(i=>{ if (!st[i]){ const it = p.items[i]; st[i] = {on: !/^\d+\/\d+\s/.test(it.concepto||""), cat: iniGuess(it.concepto)}; } });
+  return st;
+}
+function iniHTML(p, idxs, nota){
+  if (!idxs.length) return "";
+  const st = iniState(p, idxs), cats = catList("g");
+  return `<div class="full ini"><b>📥 Agregar a Inicio</b> <span class="sub">${nota||"Se registran en su día como gasto con TDC (no se descuentan de tus cuentas otra vez)."}</span>
+    <div class="pay-its">${idxs.map(i=>{ const it = p.items[i], s = st[i]; return `<div class="pay-it ini-it"><input type="checkbox" aria-label="Agregar ${esc(it.concepto)}" data-inion="${i}" data-p="${esc(p.id)}" ${s.on?"checked":""}><span>${it.fecha?dShort(it.fecha):"—"}</span><span>${esc(it.concepto)}<select data-inicat="${i}" data-p="${esc(p.id)}" aria-label="Categoría"${s.on&&!s.cat?' class="ini-miss"':""}><option value="">Categoría…</option>${cats.map(c=>`<option${s.cat===c?" selected":""}>${esc(c)}</option>`).join("")}</select></span><b class="num">${fmt(+it.monto)}</b></div>`; }).join("")}</div>
+    ${S.iniErr===p.id?'<div class="tx-warn" role="alert">Elige la categoría de los conceptos marcados.</div>':""}</div>`;
+}
+function iniBuild(p, idxs, fechaDef){
+  const st = (S.iniSt||{})[p.id]||{}, c = card(p.card), sel = idxs.filter(i=>st[i]?.on);
+  if (sel.some(i=>!st[i].cat)) return null;
+  const movs = [], links = {};
+  sel.forEach((i,k)=>{ const it = p.items[i], id = "m"+Date.now().toString(36)+k.toString(36)+Math.random().toString(36).slice(2,5);
+    movs.push({id, t:"g", f:it.fecha||fechaDef, cat:st[i].cat, cta:"TDC "+(c?cname(c):p.card), m:r2(+it.monto), n:String(it.concepto||"").trim(), tdc:p.card, pago:"contado"});
+    links[i] = id; });
+  return {movs, links};
+}
+async function iniWrite(movs){
+  const by = {}; movs.forEach(m=>(by[m.f.slice(0,7)] = by[m.f.slice(0,7)]||[]).push(m));
+  for (const ym of Object.keys(by)) await writeMonth(ym, [...monthItems(ym), ...by[ym]].sort((a,b)=>a.f.localeCompare(b.f)));
+}
+function iniIdxPay(p, f){
+  const all = (p.items||[]).map((it,i)=>i).filter(i=>iniCand(p.items[i]) && !p.items[i].pagoId);
+  return f.tipo==="concepto" ? all.filter(i=>(f.sel||[]).includes(i)) : all;
+}
+function iniIdxPaid(p){ return (p.items||[]).map((it,i)=>i).filter(i=>iniCand(p.items[i]) && (p.status==="pagado" || p.items[i].pagoId)); }
 function pagosHTML(p){
   const pg = (p.pagos||[]).slice().sort((a,b)=>a.f.localeCompare(b.f)), id = esc(p.id);
   let h = "";
@@ -462,7 +503,14 @@ function pagosHTML(p){
       <tr><td></td><td><b>Pagado</b></td><td class="n num"><b>${fmt(pagado(p))}</b></td><td></td></tr></table>
       ${p.status!=="pagado" && faltante(p)>0 ? `<div class="sub">Faltan <b class="num">${fmt(faltante(p))}</b></div>`:""}</div>`;
   }
-  if (S.payFor!==p.id) return h;
+  if (S.payFor!==p.id){
+    const pend = (p.pagos||[]).length ? iniIdxPaid(p) : [];
+    if (pend.length){
+      if (S.iniFor===p.id) h += `<div class="f ef">${iniHTML(p, pend, "Estos conceptos ya están pagados pero no aparecen en Inicio.")}<div class="actions full"><button class="btn primary" type="button" data-act="inigo" data-p="${esc(p.id)}">Agregar a Inicio</button><button class="btn" type="button" data-act="inicancel">Cancelar</button></div></div>`;
+      else h += `<div class="actions"><button class="btn sm" type="button" data-act="iniopen" data-p="${esc(p.id)}">📥 Pasar ${pend.length} concepto${pend.length>1?"s":""} a Inicio</button></div>`;
+    }
+    return h;
+  }
   const f = S.payForm || {}, ctas = (S.ctas?.list)||[];
   const tot = Math.max(0, r2(total(p)-pagado(p)));
   h += `<form class="f ef pay" data-form="pay" data-p="${id}"><b class="full">💸 Registrar pago${tot?` · faltan ${fmt(tot)}`:""}</b>
@@ -472,6 +520,7 @@ function pagosHTML(p){
     <label for="pay-m">Monto<input id="pay-m" type="number" step="0.01" inputmode="decimal" required value="${esc(f.m??"")}"></label>
     <label for="pay-f">Fecha<input id="pay-f" type="date" required value="${esc(f.f||todayISO)}"></label>
     <label class="full" for="pay-cta">Desde la cuenta<select id="pay-cta" required><option value="">Selecciona…</option>${ctas.map(c=>{ const s=ctaSaldo(c); return `<option value="${esc(c.n)}"${f.cta===c.n?" selected":""}>${esc(c.n)} · ${fmt(s)}</option>`; }).join("")}</select></label>`;
+  { const ix = iniIdxPay(p, f); h += iniHTML(p, ix, f.tipo==="minimo"||f.tipo==="otro" ? "Se agregan solo si con este pago el periodo queda cubierto." : ""); }
   if (f.warn) h += `<div class="full tx-warn" role="alert">⚠️ Si haces este pago, <b>${esc(f.cta)}</b> quedaría en <b class="num">${fmt(f.warn)}</b>. Revisa la cuenta o continúa si así lo planeaste.
       <div class="actions"><button type="button" class="btn sm" data-act="payrevisar">Revisar</button><button type="button" class="btn sm danger" data-act="paycontinuar">Continuar de todos modos</button></div></div>`;
   else h += `<div class="actions full"><button class="btn primary" type="submit">Registrar pago</button><button class="btn" type="button" data-act="paycancel">Cancelar</button>
@@ -500,8 +549,14 @@ async function doPay(p, force){
   }
   upd.status = sum >= total(p) - 0.009 ? "pagado" : "parcial";
   if (f.tipo==="minimo" && +f.min>0) upd.minimo = +f.min;
-  S.payFor = null; S.payForm = null;
-  await save(()=>db.doc("periods/"+p.id).update(upd));
+  let ini = null;
+  if (f.tipo==="concepto" || upd.status==="pagado"){
+    ini = iniBuild(p, iniIdxPay(p, f), f.f);
+    if (!ini){ S.iniErr = p.id; renderDetail(); return; }
+    if (ini.movs.length) upd.items = (upd.items || (p.items||[]).map(it=>({...it}))).map((it,i)=>ini.links[i] ? {...it, movId:ini.links[i], cuota:1} : it);
+  }
+  S.payFor = null; S.payForm = null; S.iniErr = null; if (S.iniSt) delete S.iniSt[p.id];
+  await save(async()=>{ if (ini?.movs.length) await iniWrite(ini.movs); await db.doc("periods/"+p.id).update(upd); });
 }
 
 /* ================= Adelantos de mensualidades ================= */
@@ -549,11 +604,19 @@ document.addEventListener("submit", async e=>{
 document.addEventListener("click", async e=>{
   const a = e.target.closest("[data-act]"); if (!a) return;
   const act = a.dataset.act;
-  const payActs = ["paynew","paytipo","paycancel","payrevisar","paycontinuar","paysin","paydel","adel","adelmodo","adelcancel"];
+  const payActs = ["iniopen","inigo","inicancel","paynew","paytipo","paycancel","payrevisar","paycontinuar","paysin","paydel","adel","adelmodo","adelcancel"];
   if (payActs.includes(act)){
     e.stopImmediatePropagation();
     const p = S.periods.find(x=>x.id===(a.dataset.p||S.payFor));
     switch(act){
+      case "iniopen": S.iniFor = p?.id||null; S.iniErr = null; renderDetail(); return;
+      case "inicancel": S.iniFor = null; S.iniErr = null; renderDetail(); return;
+      case "inigo": { if (!p) return; const last = (p.pagos||[]).map(g=>g.f).sort().pop()||todayISO, ini = iniBuild(p, iniIdxPaid(p), last);
+        if (!ini){ S.iniErr = p.id; renderDetail(); return; }
+        S.iniFor = null; S.iniErr = null; if (S.iniSt) delete S.iniSt[p.id];
+        if (!ini.movs.length){ renderDetail(); return; }
+        const items = (p.items||[]).map((it,i)=>ini.links[i] ? {...it, movId:ini.links[i], cuota:1} : {...it});
+        await save(async()=>{ await iniWrite(ini.movs); await db.doc("periods/"+p.id).update({items}); }); return; }
       case "paynew": if (p){ openPay(p); renderDetail(); } return;
       case "paytipo": readPay(); S.payForm.tipo = a.dataset.v; S.payForm.warn = null;
         if (p) S.payForm.m = a.dataset.v==="total" ? faltante(p) : a.dataset.v==="minimo" ? (p.minimo||"") : ""; S.payForm.sel = []; renderDetail(); return;
@@ -688,6 +751,10 @@ document.addEventListener("input", e=>{
   if (e.target.id==="tx-q"){ S.txQ = e.target.value; clearTimeout(S._tq); S._tq=setTimeout(()=>{ readTx(); renderTx(); const q=$("tx-q"); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length);} },200); }
 });
 document.addEventListener("change", async e=>{
+  const di = e.target.dataset||{};
+  if (di.inion!=null || di.inicat!=null){ const st = ((S.iniSt=S.iniSt||{})[di.p] = S.iniSt[di.p]||{}), i = di.inion ?? di.inicat; st[i] = st[i]||{};
+    if (di.inion!=null) st[i].on = e.target.checked; else st[i].cat = e.target.value;
+    const sl = document.querySelector(`select[data-inicat="${i}"][data-p="${CSS.escape(di.p)}"]`); if (sl) sl.classList.toggle("ini-miss", !!(st[i].on && !st[i].cat)); return; }
   if (e.target.dataset?.payit!=null){ readPay(); const f = S.payForm, i = +e.target.dataset.payit, p = S.periods.find(x=>x.id===S.payFor);
     f.sel = e.target.checked ? [...new Set([...(f.sel||[]), i])] : (f.sel||[]).filter(j=>j!==i);
     f.m = r2(f.sel.reduce((a,j)=>a+(+p?.items?.[j]?.monto||0),0)) || ""; f.warn = null; renderDetail(); return; }

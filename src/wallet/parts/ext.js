@@ -21,11 +21,25 @@ function apTipo(a){
   if (n.includes("pagar") || n.includes("deuda")) return "pagar";
   return "otro";
 }
+function ctaTipo(c){
+  if (c.d) return c.d;
+  const n = String(c.n||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  if (n.includes("emergen")) return "emergencias";
+  if (n.includes("salud")) return "salud";
+  if (/deuda|prestamo|diferido|adelanto/.test(n)) return "pagar";
+  if (/plerk|vales/.test(n)) return "vales";
+  if (/ahorro|fondo|gbm|maestr|ppr|rendimiento|cumple/.test(n)) return "otro";
+  return "libre";
+}
 function balanceCalc(){
   const tdd = S.cards.filter(c=>c.tipo==="TDD");
-  const cash = (S.cash?.items||[]).reduce((a,x)=>a+(+x.saldo||0),0);
+  const ctl = (S.ctas?.list)||[], useCards = !ctl.length, esEf = c=>/efectivo/i.test(c.n||"");
+  let cash = useCards || !ctl.some(esEf) ? (S.cash?.items||[]).reduce((a,x)=>a+(+x.saldo||0),0) : 0;
   let digital=0, emerg=0, salud=0, otros=0, vales=0, pagarAp=0;
-  tdd.forEach(c=>{
+  if (!useCards) ctl.forEach(c=>{ const t = ctaTipo(c); if (t==="fuera") return; const v = ctaSaldo(c);
+    if (esEf(c)) cash += v; else digital += v;
+    if (t==="emergencias") emerg+=v; else if (t==="salud") salud+=v; else if (t==="pagar") pagarAp+=v; else if (t==="vales") vales+=v; else if (t==="otro") otros+=v; });
+  if (useCards) tdd.forEach(c=>{
     const s = +c.saldo||0; digital += s;
     const ap = c.apartados||[]; const sumAp = ap.reduce((a,x)=>a+(+x.saldo||0),0);
     const libreCta = Math.max(0, s - sumAp);
@@ -42,7 +56,7 @@ function balanceCalc(){
   const totalDinero = cash + digital;
   const paraPagar = Math.max(apartadoTDC, pagarAp);
   const libre = totalDinero - paraPagar - emerg - salud - otros - vales;
-  return {cash, digital, totalDinero, paraPagar, emerg, salud, otros, vales, libre, deudaTDC, apartadoTDC, faltaApartar:Math.max(0,deudaTDC-apartadoTDC), msi, prest, deuda:deudaTDC+msi+prest};
+  return {cashCta:!useCards && ctl.some(esEf), cash, digital, totalDinero, paraPagar, emerg, salud, otros, vales, libre, deudaTDC, apartadoTDC, faltaApartar:Math.max(0,deudaTDC-apartadoTDC), msi, prest, deuda:deudaTDC+msi+prest};
 }
 function renderBalance(){
   const b = balanceCalc();
@@ -56,18 +70,21 @@ function renderBalance(){
     <div class="bal-grid num"><div><span>Estados de cuenta por pagar</span><b>${fmt(b.deudaTDC)}</b></div><div><span>Falta apartar</span><b${b.faltaApartar>0?' style="color:var(--bad)"':""}>${fmt(b.faltaApartar)}</b></div>
     <div><span>Meses por facturar</span><b>${fmt(b.msi)}</b></div><div><span>Préstamos</span><b>${fmt(b.prest)}</b></div></div></div>
     <div class="sec-head"><span class="sub">Neto (dinero − deuda)</span><b class="num" style="color:${b.totalDinero-b.deuda<0?"var(--bad)":"var(--ok)"}">${fmt(b.totalDinero-b.deuda)}</b></div>
-    <div class="actions"><button class="btn sm" data-act="cashedit">${S.cashEdit?"Cerrar":"Editar efectivo"}</button><button class="btn sm" data-act="aptags">${S.apTags?"Cerrar":"Clasificar apartados"}</button></div>`;
+    <p class="sub" style="margin:4px 0 0">Saldos tomados de Cuentas: se actualizan solos con tus gastos, ingresos, transferencias y pagos de tarjetas.</p>
+    <div class="actions">${b.cashCta?"":`<button class="btn sm" data-act="cashedit">${S.cashEdit?"Cerrar":"Editar efectivo"}</button>`}<button class="btn sm" data-act="aptags">${S.apTags?"Cerrar":"Clasificar cuentas"}</button></div>`;
   if (S.cashEdit){
     const it = S.cashDraft;
     h += `<div class="panel" style="background:var(--bg)"><table class="bt"><tbody>${it.map((x,i)=>`<tr><td><input id="cs-n-${i}" aria-label="Nombre" data-cash="${i}" data-k="nombre" value="${esc(x.nombre)}"></td><td style="width:110px"><input id="cs-s-${i}" aria-label="Monto" type="number" step="0.01" data-cash="${i}" data-k="saldo" value="${x.saldo??""}"></td><td class="x"><button class="iconbtn" data-act="delcash" data-i="${i}" aria-label="Quitar">×</button></td></tr>`).join("")}</tbody></table>
       <div class="actions"><button class="btn sm" data-act="addcash">+ Agregar</button><button class="btn sm primary" data-act="savecash">Guardar</button></div></div>`;
   }
   if (S.apTags){
-    const rows = []; S.cards.filter(c=>c.tipo==="TDD").forEach(c=>{
+    const rows = [], ctl = (S.ctas?.list)||[];
+    if (ctl.length) ctl.forEach((c,i)=>rows.push(`<tr><td>${esc(c.n)} <span class="sub num">${fmt(ctaSaldo(c))}</span></td><td><select data-ctatag="${i}" aria-label="Tipo de cuenta">${[...AP_TIPOS,["fuera","No contar en Balance"]].map(([v,l])=>`<option value="${v}"${ctaTipo(c)===v?" selected":""}>${l}</option>`).join("")}</select></td></tr>`));
+    else S.cards.filter(c=>c.tipo==="TDD").forEach(c=>{
       rows.push(`<tr><td><b>${esc(cname(c))}</b> <span class="sub">(saldo libre de la cuenta)</span></td><td><select data-dest="${esc(c.id)}" aria-label="Destino">${AP_TIPOS.filter(t=>["libre","emergencias","salud","vales"].includes(t[0])).map(([v,l])=>`<option value="${v}"${(c.destino||"libre")===v?" selected":""}>${l}</option>`).join("")}</select></td></tr>`);
       (c.apartados||[]).forEach((a,i)=>rows.push(`<tr><td style="padding-left:16px">${esc(a.nombre)} <span class="sub num">${fmt(a.saldo)}</span></td><td><select data-aptag="${esc(c.id)}" data-i="${i}" aria-label="Tipo de apartado">${AP_TIPOS.filter(t=>t[0]!=="libre").map(([v,l])=>`<option value="${v}"${apTipo(a)===v?" selected":""}>${l}</option>`).join("")}</select></td></tr>`));
     });
-    h += `<div class="panel" style="background:var(--bg)"><p class="sub" style="margin:0">Indica para qué es cada apartado. “Para pagar” no se suma dos veces: se compara con lo que marcaste como apartado en tus estados de cuenta.</p><table class="bt"><tbody>${rows.join("")}</tbody></table></div>`;
+    h += `<div class="panel" style="background:var(--bg)"><p class="sub" style="margin:0">${(S.ctas?.list||[]).length?"Indica para qué es cada cuenta (lo propuse por su nombre). “No contar” la saca del Balance.":"Indica para qué es cada apartado."}  “Para pagar” no se suma dos veces: se compara con lo que marcaste como apartado en tus estados de cuenta.</p><table class="bt"><tbody>${rows.join("")}</tbody></table></div>`;
   }
   $("balance").innerHTML = h;
 }
@@ -336,6 +353,8 @@ document.addEventListener("submit", e=>{
 
 document.addEventListener("change", async e=>{
   if (e.target.id==="mv-t"){ const dl=$("dl-cat"); if (dl) dl.innerHTML = catList(e.target.value).map(c=>`<option value="${esc(c)}">`).join(""); return; }
+  const ct = e.target.closest("[data-ctatag]");
+  if (ct && db && S.ctas){ const list = S.ctas.list.map(x=>({...x})); list[+ct.dataset.ctatag].d = ct.value; await save(()=>db.doc("config/cuentas").set({...S.ctas, list})); return; }
   const d = e.target.closest("[data-dest]");
   if (d && db){ await save(()=>db.doc("cards/"+d.dataset.dest).update({destino:d.value})); return; }
   const t = e.target.closest("[data-aptag]");

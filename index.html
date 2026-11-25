@@ -434,6 +434,9 @@ html:root.th-dark.th-green{--bg:#141a0d; --surface:#222a1d; --ink:#eef3ea; --mut
 .f .pay-it{display:grid;flex-direction:row;text-align:left;grid-template-columns:auto 52px 1fr auto;gap:8px;align-items:center;padding:7px 9px;border-top:1px solid var(--line);font-size:13px;cursor:pointer}
 .f .pay-it:first-child{border-top:0}
 .f .pay-it input{margin:0;width:18px;height:18px}
+.ini{display:flex;flex-direction:column;gap:6px}
+.f .ini-it select{display:block;width:100%;margin-top:4px;font-size:12px;padding:4px 6px}
+.f .ini-it select.ini-miss{border-color:var(--bad)}
 .paid-tag{font-size:11px;color:var(--ok);font-weight:600}
 td.paid{color:var(--ok);text-decoration:line-through}
 
@@ -1170,11 +1173,25 @@ function apTipo(a){
   if (n.includes("pagar") || n.includes("deuda")) return "pagar";
   return "otro";
 }
+function ctaTipo(c){
+  if (c.d) return c.d;
+  const n = String(c.n||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  if (n.includes("emergen")) return "emergencias";
+  if (n.includes("salud")) return "salud";
+  if (/deuda|prestamo|diferido|adelanto/.test(n)) return "pagar";
+  if (/plerk|vales/.test(n)) return "vales";
+  if (/ahorro|fondo|gbm|maestr|ppr|rendimiento|cumple/.test(n)) return "otro";
+  return "libre";
+}
 function balanceCalc(){
   const tdd = S.cards.filter(c=>c.tipo==="TDD");
-  const cash = (S.cash?.items||[]).reduce((a,x)=>a+(+x.saldo||0),0);
+  const ctl = (S.ctas?.list)||[], useCards = !ctl.length, esEf = c=>/efectivo/i.test(c.n||"");
+  let cash = useCards || !ctl.some(esEf) ? (S.cash?.items||[]).reduce((a,x)=>a+(+x.saldo||0),0) : 0;
   let digital=0, emerg=0, salud=0, otros=0, vales=0, pagarAp=0;
-  tdd.forEach(c=>{
+  if (!useCards) ctl.forEach(c=>{ const t = ctaTipo(c); if (t==="fuera") return; const v = ctaSaldo(c);
+    if (esEf(c)) cash += v; else digital += v;
+    if (t==="emergencias") emerg+=v; else if (t==="salud") salud+=v; else if (t==="pagar") pagarAp+=v; else if (t==="vales") vales+=v; else if (t==="otro") otros+=v; });
+  if (useCards) tdd.forEach(c=>{
     const s = +c.saldo||0; digital += s;
     const ap = c.apartados||[]; const sumAp = ap.reduce((a,x)=>a+(+x.saldo||0),0);
     const libreCta = Math.max(0, s - sumAp);
@@ -1191,7 +1208,7 @@ function balanceCalc(){
   const totalDinero = cash + digital;
   const paraPagar = Math.max(apartadoTDC, pagarAp);
   const libre = totalDinero - paraPagar - emerg - salud - otros - vales;
-  return {cash, digital, totalDinero, paraPagar, emerg, salud, otros, vales, libre, deudaTDC, apartadoTDC, faltaApartar:Math.max(0,deudaTDC-apartadoTDC), msi, prest, deuda:deudaTDC+msi+prest};
+  return {cashCta:!useCards && ctl.some(esEf), cash, digital, totalDinero, paraPagar, emerg, salud, otros, vales, libre, deudaTDC, apartadoTDC, faltaApartar:Math.max(0,deudaTDC-apartadoTDC), msi, prest, deuda:deudaTDC+msi+prest};
 }
 function renderBalance(){
   const b = balanceCalc();
@@ -1205,18 +1222,21 @@ function renderBalance(){
     <div class="bal-grid num"><div><span>Estados de cuenta por pagar</span><b>${fmt(b.deudaTDC)}</b></div><div><span>Falta apartar</span><b${b.faltaApartar>0?' style="color:var(--bad)"':""}>${fmt(b.faltaApartar)}</b></div>
     <div><span>Meses por facturar</span><b>${fmt(b.msi)}</b></div><div><span>Préstamos</span><b>${fmt(b.prest)}</b></div></div></div>
     <div class="sec-head"><span class="sub">Neto (dinero − deuda)</span><b class="num" style="color:${b.totalDinero-b.deuda<0?"var(--bad)":"var(--ok)"}">${fmt(b.totalDinero-b.deuda)}</b></div>
-    <div class="actions"><button class="btn sm" data-act="cashedit">${S.cashEdit?"Cerrar":"Editar efectivo"}</button><button class="btn sm" data-act="aptags">${S.apTags?"Cerrar":"Clasificar apartados"}</button></div>`;
+    <p class="sub" style="margin:4px 0 0">Saldos tomados de Cuentas: se actualizan solos con tus gastos, ingresos, transferencias y pagos de tarjetas.</p>
+    <div class="actions">${b.cashCta?"":`<button class="btn sm" data-act="cashedit">${S.cashEdit?"Cerrar":"Editar efectivo"}</button>`}<button class="btn sm" data-act="aptags">${S.apTags?"Cerrar":"Clasificar cuentas"}</button></div>`;
   if (S.cashEdit){
     const it = S.cashDraft;
     h += `<div class="panel" style="background:var(--bg)"><table class="bt"><tbody>${it.map((x,i)=>`<tr><td><input id="cs-n-${i}" aria-label="Nombre" data-cash="${i}" data-k="nombre" value="${esc(x.nombre)}"></td><td style="width:110px"><input id="cs-s-${i}" aria-label="Monto" type="number" step="0.01" data-cash="${i}" data-k="saldo" value="${x.saldo??""}"></td><td class="x"><button class="iconbtn" data-act="delcash" data-i="${i}" aria-label="Quitar">×</button></td></tr>`).join("")}</tbody></table>
       <div class="actions"><button class="btn sm" data-act="addcash">+ Agregar</button><button class="btn sm primary" data-act="savecash">Guardar</button></div></div>`;
   }
   if (S.apTags){
-    const rows = []; S.cards.filter(c=>c.tipo==="TDD").forEach(c=>{
+    const rows = [], ctl = (S.ctas?.list)||[];
+    if (ctl.length) ctl.forEach((c,i)=>rows.push(`<tr><td>${esc(c.n)} <span class="sub num">${fmt(ctaSaldo(c))}</span></td><td><select data-ctatag="${i}" aria-label="Tipo de cuenta">${[...AP_TIPOS,["fuera","No contar en Balance"]].map(([v,l])=>`<option value="${v}"${ctaTipo(c)===v?" selected":""}>${l}</option>`).join("")}</select></td></tr>`));
+    else S.cards.filter(c=>c.tipo==="TDD").forEach(c=>{
       rows.push(`<tr><td><b>${esc(cname(c))}</b> <span class="sub">(saldo libre de la cuenta)</span></td><td><select data-dest="${esc(c.id)}" aria-label="Destino">${AP_TIPOS.filter(t=>["libre","emergencias","salud","vales"].includes(t[0])).map(([v,l])=>`<option value="${v}"${(c.destino||"libre")===v?" selected":""}>${l}</option>`).join("")}</select></td></tr>`);
       (c.apartados||[]).forEach((a,i)=>rows.push(`<tr><td style="padding-left:16px">${esc(a.nombre)} <span class="sub num">${fmt(a.saldo)}</span></td><td><select data-aptag="${esc(c.id)}" data-i="${i}" aria-label="Tipo de apartado">${AP_TIPOS.filter(t=>t[0]!=="libre").map(([v,l])=>`<option value="${v}"${apTipo(a)===v?" selected":""}>${l}</option>`).join("")}</select></td></tr>`));
     });
-    h += `<div class="panel" style="background:var(--bg)"><p class="sub" style="margin:0">Indica para qué es cada apartado. “Para pagar” no se suma dos veces: se compara con lo que marcaste como apartado en tus estados de cuenta.</p><table class="bt"><tbody>${rows.join("")}</tbody></table></div>`;
+    h += `<div class="panel" style="background:var(--bg)"><p class="sub" style="margin:0">${(S.ctas?.list||[]).length?"Indica para qué es cada cuenta (lo propuse por su nombre). “No contar” la saca del Balance.":"Indica para qué es cada apartado."}  “Para pagar” no se suma dos veces: se compara con lo que marcaste como apartado en tus estados de cuenta.</p><table class="bt"><tbody>${rows.join("")}</tbody></table></div>`;
   }
   $("balance").innerHTML = h;
 }
@@ -1485,6 +1505,8 @@ document.addEventListener("submit", e=>{
 
 document.addEventListener("change", async e=>{
   if (e.target.id==="mv-t"){ const dl=$("dl-cat"); if (dl) dl.innerHTML = catList(e.target.value).map(c=>`<option value="${esc(c)}">`).join(""); return; }
+  const ct = e.target.closest("[data-ctatag]");
+  if (ct && db && S.ctas){ const list = S.ctas.list.map(x=>({...x})); list[+ct.dataset.ctatag].d = ct.value; await save(()=>db.doc("config/cuentas").set({...S.ctas, list})); return; }
   const d = e.target.closest("[data-dest]");
   if (d && db){ await save(()=>db.doc("cards/"+d.dataset.dest).update({destino:d.value})); return; }
   const t = e.target.closest("[data-aptag]");
@@ -2198,6 +2220,47 @@ async function addTipo(nombre){
 /* ================= Pagos de periodos TDC ================= */
 const pagado = p => r2((p.pagos||[]).reduce((a,g)=>a+(+g.m||0),0));
 const faltante = p => p.status==="pagado" ? 0 : Math.max(0, r2(total(p) - pagado(p)));
+/* ---- Conceptos de la Wallet que no están en Inicio ---- */
+const iniNorm = t => String(t||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/^\d+\/\d+\s+/,"").replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();
+const INI_KW = [[/rappi|uber ?eats|didi ?food|restaurant|cafe|starbucks|pizza|tacos|burger|kfc|mcdonald/,"Alimentación"],[/oxxo|chedraui|walmart|soriana|sams|costco|bodega|super|mega|aurrera|7 ?eleven/,"Despensa"],[/uber|didi|cabify|taxi/,"Taxi"],[/gasolin|pemex|shell|mobil|g500|oxxo gas/,"Gasolina"],[/amazon|mercado ?libre|shein|temu|aliexpress|liverpool online/,"Compras online"],[/spotify/,"Spotify"],[/netflix|disney|hbo|max|prime video|youtube|vix|apple tv/,"Streaming"],[/farmacia|doctor|hospital|laboratorio|similares|guadalajara/,"Salud"],[/telcel|at t|izzi|totalplay|telmex|megacable/,"Internet"],[/vuelo|aeromexico|volaris|viva ?aerobus/,"Viaje"],[/hotel|airbnb|booking/,"Hospedaje"],[/\bado\b|autobus|tren maya/,"Transporte"],[/cine|cinepolis|cinemex/,"Cine"]];
+function iniGuess(concepto){
+  const k = iniNorm(concepto); if (!k) return "";
+  const ms = allMonths().slice(-36).reverse();
+  for (const ym of ms){ const hit = monthItems(ym).slice().reverse().find(x=>{ if (x.t!=="g" || !x.cat) return false; const n = iniNorm(x.n); return n && (n===k || (n.length>=4 && k.includes(n)) || (k.length>=4 && n.includes(k))); }); if (hit) return hit.cat; }
+  const cats = catList("g"), kw = INI_KW.find(([re,c])=>re.test(k) && cats.includes(c));
+  return kw ? kw[1] : "";
+}
+const iniCand = it => !it.movId && !it.adelanto && +it.monto>0;
+function iniState(p, idxs){
+  const st = (S.iniSt = S.iniSt||{})[p.id] = S.iniSt[p.id]||{};
+  idxs.forEach(i=>{ if (!st[i]){ const it = p.items[i]; st[i] = {on: !/^\d+\/\d+\s/.test(it.concepto||""), cat: iniGuess(it.concepto)}; } });
+  return st;
+}
+function iniHTML(p, idxs, nota){
+  if (!idxs.length) return "";
+  const st = iniState(p, idxs), cats = catList("g");
+  return `<div class="full ini"><b>📥 Agregar a Inicio</b> <span class="sub">${nota||"Se registran en su día como gasto con TDC (no se descuentan de tus cuentas otra vez)."}</span>
+    <div class="pay-its">${idxs.map(i=>{ const it = p.items[i], s = st[i]; return `<div class="pay-it ini-it"><input type="checkbox" aria-label="Agregar ${esc(it.concepto)}" data-inion="${i}" data-p="${esc(p.id)}" ${s.on?"checked":""}><span>${it.fecha?dShort(it.fecha):"—"}</span><span>${esc(it.concepto)}<select data-inicat="${i}" data-p="${esc(p.id)}" aria-label="Categoría"${s.on&&!s.cat?' class="ini-miss"':""}><option value="">Categoría…</option>${cats.map(c=>`<option${s.cat===c?" selected":""}>${esc(c)}</option>`).join("")}</select></span><b class="num">${fmt(+it.monto)}</b></div>`; }).join("")}</div>
+    ${S.iniErr===p.id?'<div class="tx-warn" role="alert">Elige la categoría de los conceptos marcados.</div>':""}</div>`;
+}
+function iniBuild(p, idxs, fechaDef){
+  const st = (S.iniSt||{})[p.id]||{}, c = card(p.card), sel = idxs.filter(i=>st[i]?.on);
+  if (sel.some(i=>!st[i].cat)) return null;
+  const movs = [], links = {};
+  sel.forEach((i,k)=>{ const it = p.items[i], id = "m"+Date.now().toString(36)+k.toString(36)+Math.random().toString(36).slice(2,5);
+    movs.push({id, t:"g", f:it.fecha||fechaDef, cat:st[i].cat, cta:"TDC "+(c?cname(c):p.card), m:r2(+it.monto), n:String(it.concepto||"").trim(), tdc:p.card, pago:"contado"});
+    links[i] = id; });
+  return {movs, links};
+}
+async function iniWrite(movs){
+  const by = {}; movs.forEach(m=>(by[m.f.slice(0,7)] = by[m.f.slice(0,7)]||[]).push(m));
+  for (const ym of Object.keys(by)) await writeMonth(ym, [...monthItems(ym), ...by[ym]].sort((a,b)=>a.f.localeCompare(b.f)));
+}
+function iniIdxPay(p, f){
+  const all = (p.items||[]).map((it,i)=>i).filter(i=>iniCand(p.items[i]) && !p.items[i].pagoId);
+  return f.tipo==="concepto" ? all.filter(i=>(f.sel||[]).includes(i)) : all;
+}
+function iniIdxPaid(p){ return (p.items||[]).map((it,i)=>i).filter(i=>iniCand(p.items[i]) && (p.status==="pagado" || p.items[i].pagoId)); }
 function pagosHTML(p){
   const pg = (p.pagos||[]).slice().sort((a,b)=>a.f.localeCompare(b.f)), id = esc(p.id);
   let h = "";
@@ -2206,7 +2269,14 @@ function pagosHTML(p){
       <tr><td></td><td><b>Pagado</b></td><td class="n num"><b>${fmt(pagado(p))}</b></td><td></td></tr></table>
       ${p.status!=="pagado" && faltante(p)>0 ? `<div class="sub">Faltan <b class="num">${fmt(faltante(p))}</b></div>`:""}</div>`;
   }
-  if (S.payFor!==p.id) return h;
+  if (S.payFor!==p.id){
+    const pend = (p.pagos||[]).length ? iniIdxPaid(p) : [];
+    if (pend.length){
+      if (S.iniFor===p.id) h += `<div class="f ef">${iniHTML(p, pend, "Estos conceptos ya están pagados pero no aparecen en Inicio.")}<div class="actions full"><button class="btn primary" type="button" data-act="inigo" data-p="${esc(p.id)}">Agregar a Inicio</button><button class="btn" type="button" data-act="inicancel">Cancelar</button></div></div>`;
+      else h += `<div class="actions"><button class="btn sm" type="button" data-act="iniopen" data-p="${esc(p.id)}">📥 Pasar ${pend.length} concepto${pend.length>1?"s":""} a Inicio</button></div>`;
+    }
+    return h;
+  }
   const f = S.payForm || {}, ctas = (S.ctas?.list)||[];
   const tot = Math.max(0, r2(total(p)-pagado(p)));
   h += `<form class="f ef pay" data-form="pay" data-p="${id}"><b class="full">💸 Registrar pago${tot?` · faltan ${fmt(tot)}`:""}</b>
@@ -2216,6 +2286,7 @@ function pagosHTML(p){
     <label for="pay-m">Monto<input id="pay-m" type="number" step="0.01" inputmode="decimal" required value="${esc(f.m??"")}"></label>
     <label for="pay-f">Fecha<input id="pay-f" type="date" required value="${esc(f.f||todayISO)}"></label>
     <label class="full" for="pay-cta">Desde la cuenta<select id="pay-cta" required><option value="">Selecciona…</option>${ctas.map(c=>{ const s=ctaSaldo(c); return `<option value="${esc(c.n)}"${f.cta===c.n?" selected":""}>${esc(c.n)} · ${fmt(s)}</option>`; }).join("")}</select></label>`;
+  { const ix = iniIdxPay(p, f); h += iniHTML(p, ix, f.tipo==="minimo"||f.tipo==="otro" ? "Se agregan solo si con este pago el periodo queda cubierto." : ""); }
   if (f.warn) h += `<div class="full tx-warn" role="alert">⚠️ Si haces este pago, <b>${esc(f.cta)}</b> quedaría en <b class="num">${fmt(f.warn)}</b>. Revisa la cuenta o continúa si así lo planeaste.
       <div class="actions"><button type="button" class="btn sm" data-act="payrevisar">Revisar</button><button type="button" class="btn sm danger" data-act="paycontinuar">Continuar de todos modos</button></div></div>`;
   else h += `<div class="actions full"><button class="btn primary" type="submit">Registrar pago</button><button class="btn" type="button" data-act="paycancel">Cancelar</button>
@@ -2244,8 +2315,14 @@ async function doPay(p, force){
   }
   upd.status = sum >= total(p) - 0.009 ? "pagado" : "parcial";
   if (f.tipo==="minimo" && +f.min>0) upd.minimo = +f.min;
-  S.payFor = null; S.payForm = null;
-  await save(()=>db.doc("periods/"+p.id).update(upd));
+  let ini = null;
+  if (f.tipo==="concepto" || upd.status==="pagado"){
+    ini = iniBuild(p, iniIdxPay(p, f), f.f);
+    if (!ini){ S.iniErr = p.id; renderDetail(); return; }
+    if (ini.movs.length) upd.items = (upd.items || (p.items||[]).map(it=>({...it}))).map((it,i)=>ini.links[i] ? {...it, movId:ini.links[i], cuota:1} : it);
+  }
+  S.payFor = null; S.payForm = null; S.iniErr = null; if (S.iniSt) delete S.iniSt[p.id];
+  await save(async()=>{ if (ini?.movs.length) await iniWrite(ini.movs); await db.doc("periods/"+p.id).update(upd); });
 }
 
 /* ================= Adelantos de mensualidades ================= */
@@ -2293,11 +2370,19 @@ document.addEventListener("submit", async e=>{
 document.addEventListener("click", async e=>{
   const a = e.target.closest("[data-act]"); if (!a) return;
   const act = a.dataset.act;
-  const payActs = ["paynew","paytipo","paycancel","payrevisar","paycontinuar","paysin","paydel","adel","adelmodo","adelcancel"];
+  const payActs = ["iniopen","inigo","inicancel","paynew","paytipo","paycancel","payrevisar","paycontinuar","paysin","paydel","adel","adelmodo","adelcancel"];
   if (payActs.includes(act)){
     e.stopImmediatePropagation();
     const p = S.periods.find(x=>x.id===(a.dataset.p||S.payFor));
     switch(act){
+      case "iniopen": S.iniFor = p?.id||null; S.iniErr = null; renderDetail(); return;
+      case "inicancel": S.iniFor = null; S.iniErr = null; renderDetail(); return;
+      case "inigo": { if (!p) return; const last = (p.pagos||[]).map(g=>g.f).sort().pop()||todayISO, ini = iniBuild(p, iniIdxPaid(p), last);
+        if (!ini){ S.iniErr = p.id; renderDetail(); return; }
+        S.iniFor = null; S.iniErr = null; if (S.iniSt) delete S.iniSt[p.id];
+        if (!ini.movs.length){ renderDetail(); return; }
+        const items = (p.items||[]).map((it,i)=>ini.links[i] ? {...it, movId:ini.links[i], cuota:1} : {...it});
+        await save(async()=>{ await iniWrite(ini.movs); await db.doc("periods/"+p.id).update({items}); }); return; }
       case "paynew": if (p){ openPay(p); renderDetail(); } return;
       case "paytipo": readPay(); S.payForm.tipo = a.dataset.v; S.payForm.warn = null;
         if (p) S.payForm.m = a.dataset.v==="total" ? faltante(p) : a.dataset.v==="minimo" ? (p.minimo||"") : ""; S.payForm.sel = []; renderDetail(); return;
@@ -2432,6 +2517,10 @@ document.addEventListener("input", e=>{
   if (e.target.id==="tx-q"){ S.txQ = e.target.value; clearTimeout(S._tq); S._tq=setTimeout(()=>{ readTx(); renderTx(); const q=$("tx-q"); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length);} },200); }
 });
 document.addEventListener("change", async e=>{
+  const di = e.target.dataset||{};
+  if (di.inion!=null || di.inicat!=null){ const st = ((S.iniSt=S.iniSt||{})[di.p] = S.iniSt[di.p]||{}), i = di.inion ?? di.inicat; st[i] = st[i]||{};
+    if (di.inion!=null) st[i].on = e.target.checked; else st[i].cat = e.target.value;
+    const sl = document.querySelector(`select[data-inicat="${i}"][data-p="${CSS.escape(di.p)}"]`); if (sl) sl.classList.toggle("ini-miss", !!(st[i].on && !st[i].cat)); return; }
   if (e.target.dataset?.payit!=null){ readPay(); const f = S.payForm, i = +e.target.dataset.payit, p = S.periods.find(x=>x.id===S.payFor);
     f.sel = e.target.checked ? [...new Set([...(f.sel||[]), i])] : (f.sel||[]).filter(j=>j!==i);
     f.m = r2(f.sel.reduce((a,j)=>a+(+p?.items?.[j]?.monto||0),0)) || ""; f.warn = null; renderDetail(); return; }
