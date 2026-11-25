@@ -66,8 +66,15 @@ function renderCuentas(){
       return `<div class="ubi-g"><div class="sec-head"><b>${g==="efectivo"?"💵 ":g?"💳 ":"❔ "}${esc(ctaEnName(g))}</b><b class="num">${fmt(tot)}</b></div>${its.map(o=>`<div class="ubi-r"><span>${esc(o.c.n)}</span><span class="num">${fmt(ctaSaldo(o.c))}</span><select data-ctaen="${o.i}" aria-label="Dónde está ${esc(o.c.n)}">${ctaEnOpts(g)}</select></div>`).join("") || '<p class="sub" style="margin:4px 0">Sin cuentas.</p>'}</div>`; }).join("");
     box.innerHTML = h; return;
   }
-  h += `<div class="ct-list">` + list.map((c,i)=>{ const v=ctaSaldo(c);
-    return `<button class="ct-row" data-act="ctaedit" data-i="${i}"><span class="ct-ic" style="background:${ctaColor(c.n)}">${ctaIcon(c.n)}</span><span class="ct-n">${esc(c.n)}<small class="ct-en">${esc(ctaEnName(ctaEn(c)))}</small></span>${c.t?"":'<span class="ct-hid" title="No suma al total" aria-label="No suma al total">⊘</span>'}<span class="num ct-v${v<0?" neg":""}">${fmt(v)}</span></button>`; }).join("") + `</div>
+  const row = (c,i)=>{ const v=ctaSaldo(c);
+    return `<button class="ct-row" data-act="ctaedit" data-i="${i}"><span class="ct-ic" style="background:${ctaColor(c.n)}">${ctaIcon(c.n)}</span><span class="ct-n">${esc(c.n)}</span>${c.t?"":'<span class="ct-hid" title="No suma al total" aria-label="No suma al total">⊘</span>'}<span class="num ct-v${v<0?" neg":""}">${fmt(v)}</span></button>`; };
+  if (S.ctaMove) h += ctaMoveHTML();
+  h += `<p class="sub ct-tip">Mantén presionada una cuenta y arrástrala para cambiarla de lugar.</p>`;
+  h += [...tddCards().map(c=>c.id), "efectivo", ""].map(g=>{
+    const its = list.map((c,i)=>({c,i})).filter(o=>ctaEn(o.c)===g); if (!its.length && g==="") return "";
+    const tot = its.reduce((a,o)=>a+ctaSaldo(o.c),0);
+    return `<div class="ct-grp" data-g="${esc(g)}"><div class="ct-gh"><span>${g==="efectivo"?"💵":g?"💳":"❔"} ${esc(ctaEnName(g))}</span><span class="num">${fmt(tot)}</span></div><div class="ct-list">${its.map(o=>row(o.c,o.i)).join("") || '<p class="sub ct-empty">Suelta aquí una cuenta</p>'}</div></div>`;
+  }).join("") + `
     <div class="actions"><button class="btn sm" data-act="ctanew">+ Agregar cuenta</button></div>
     <p class="sub" style="margin:0">⊘ = no suma al total (igual que el ojo tachado de tu app). Saldos al ${dLong(BASE_CTAS)}; desde ahí se actualizan con tus movimientos y transferencias.</p>`;
   box.innerHTML = h;
@@ -359,4 +366,65 @@ async function ctaBorrar(x, dest){
     await db.doc("config/cuentas").set({...S.ctas, list:l});
   });
   S.ctaEdit = null; S.ctaConfirm = false; renderCuentas();
+}
+
+/* ---- Arrastrar cuentas (mantener presionado) ---- */
+function ctaMoveHTML(){
+  const m = S.ctaMove, c = S.ctas.list[m.from]; if (!c) return "";
+  return `<div class="tx-warn ct-mv" role="alert">↔️ Moviste <b>${esc(c.n)}</b> de <b>${esc(ctaEnName(m.de))}</b> a <b>${esc(ctaEnName(m.a))}</b>. ¿Quieres cambiarla de tarjeta?
+    <div class="actions"><button type="button" class="btn sm primary" data-act="ctamvok">Sí, cambiar a ${esc(ctaEnName(m.a))}</button><button type="button" class="btn sm" data-act="ctamvno">No, dejarla donde estaba</button></div></div>`;
+}
+async function ctaReorder(from, toIdx, en){
+  const l = S.ctas.list.map(x=>({...x})), [it] = l.splice(from,1);
+  if (en!==undefined) it.en = en;
+  l.splice(toIdx > from ? toIdx-1 : toIdx, 0, it);
+  S.ctas = {...S.ctas, list:l}; renderCuentas(); updAb();
+  if (db) await save(()=>db.doc("config/cuentas").set({...S.ctas, list:l}));
+}
+{
+  const D = {t:null, on:false, row:null, ghost:null, x0:0, y0:0, dy:0, tgt:null, raf:0, sup:false};
+  const clear = ()=>{ document.querySelectorAll(".ct-row.drop-b,.ct-row.drop-a,.ct-grp.drop-g").forEach(e=>e.classList.remove("drop-b","drop-a","drop-g")); };
+  const end = ()=>{ clearTimeout(D.t); D.t=null; cancelAnimationFrame(D.raf); if (D.ghost) D.ghost.remove(); if (D.row) D.row.classList.remove("dragging"); clear(); D.on=false; D.ghost=null; D.row=null; document.body.classList.remove("ct-dragging"); };
+  const findTarget = (x,y)=>{
+    if (D.ghost) D.ghost.style.display="none"; const el = document.elementFromPoint(x,y); if (D.ghost) D.ghost.style.display="";
+    const r = el?.closest?.("#cuentas .ct-row"); clear();
+    if (r && r!==D.row){ const b=r.getBoundingClientRect(), after = y > b.top+b.height/2; r.classList.add(after?"drop-a":"drop-b"); return {i:+r.dataset.i, after, g:r.closest(".ct-grp")?.dataset.g ?? ""}; }
+    const g = el?.closest?.("#cuentas .ct-grp"); if (g){ g.classList.add("drop-g"); return {g:g.dataset.g, i:null}; }
+    return null;
+  };
+  const scrollLoop = ()=>{ if (!D.on) return; const m=60; if (D.cy < m) scrollBy(0,-12); else if (D.cy > innerHeight-m) scrollBy(0,12); D.raf = requestAnimationFrame(scrollLoop); };
+  document.addEventListener("pointerdown", e=>{
+    const r = e.target.closest?.("#cuentas .ct-row[data-i]"); if (!r || S.ctaUbi || S.trfView || e.button>0) return;
+    D.x0=e.clientX; D.y0=e.clientY; D.cy=e.clientY;
+    D.t = setTimeout(()=>{ D.t=null; D.on=true; D.row=r; const b=r.getBoundingClientRect(); D.dy=D.y0-b.top;
+      D.ghost = r.cloneNode(true); D.ghost.classList.add("ct-ghost"); Object.assign(D.ghost.style,{left:b.left+"px",top:b.top+"px",width:b.width+"px"}); document.body.appendChild(D.ghost);
+      r.classList.add("dragging"); document.body.classList.add("ct-dragging"); try{ navigator.vibrate?.(15); }catch(_){}
+      try{ r.setPointerCapture?.(e.pointerId); }catch(_){}
+      scrollLoop(); }, 450);
+  });
+  document.addEventListener("pointermove", e=>{
+    if (D.t && Math.hypot(e.clientX-D.x0, e.clientY-D.y0) > 8){ clearTimeout(D.t); D.t=null; return; }
+    if (!D.on) return; e.preventDefault(); D.cy=e.clientY;
+    D.ghost.style.top = (e.clientY - D.dy)+"px"; D.tgt = findTarget(e.clientX, e.clientY);
+  }, {passive:false});
+  document.addEventListener("touchmove", e=>{ if (D.on) e.preventDefault(); }, {passive:false});
+  const up = async e=>{
+    if (D.t){ clearTimeout(D.t); D.t=null; return; }
+    if (!D.on) return; const from = +D.row.dataset.i, tg = D.tgt; end(); D.sup = true; setTimeout(()=>D.sup=false, 350);
+    if (!tg) return; const list = S.ctas.list, c = list[from], de = ctaEn(c);
+    let to;
+    if (tg.i==null){ const idx = list.map((x,k)=>k).filter(k=>ctaEn(list[k])===tg.g); to = idx.length ? idx[idx.length-1]+1 : list.length; }
+    else to = tg.i + (tg.after?1:0);
+    if (to===from || to===from+1){ if (tg.g===de) return; }
+    if (tg.g!==de){ S.ctaMove = {from, to, de, a:tg.g}; renderCuentas(); document.querySelector(".ct-mv")?.scrollIntoView({block:"center", behavior:"smooth"}); return; }
+    await ctaReorder(from, to);
+  };
+  document.addEventListener("pointerup", up); document.addEventListener("pointercancel", ()=>{ if (D.t){ clearTimeout(D.t); D.t=null; } if (D.on) end(); });
+  document.addEventListener("click", e=>{ if (D.sup && e.target.closest?.("#cuentas .ct-row")){ e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+  document.addEventListener("contextmenu", e=>{ if (e.target.closest?.("#cuentas .ct-row")) e.preventDefault(); });
+  document.addEventListener("click", async e=>{
+    const a = e.target.closest?.("[data-act=ctamvok],[data-act=ctamvno]"); if (!a) return; e.stopImmediatePropagation();
+    const m = S.ctaMove; S.ctaMove = null;
+    if (a.dataset.act==="ctamvok" && m) await ctaReorder(m.from, m.to, m.a); else renderCuentas();
+  }, true);
 }
