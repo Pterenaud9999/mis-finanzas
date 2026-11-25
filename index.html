@@ -437,6 +437,7 @@ html:root.th-dark.th-green{--bg:#141a0d; --surface:#222a1d; --ink:#eef3ea; --mut
 .ini{display:flex;flex-direction:column;gap:6px}
 .tdd-ctas{display:flex;flex-direction:column;gap:2px;max-height:240px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:6px 10px;margin-top:4px}
 .tdd-ctas .chk{font-size:13px}
+.led{margin:8px 0}.led .xt td{font-size:13px}.led .tx-warn ul{margin:6px 0 0;padding-left:18px}
 .f .ini-it select{display:block;width:100%;margin-top:4px;font-size:12px;padding:4px 6px}
 .f .ini-it select.ini-miss{border-color:var(--bad)}
 .paid-tag{font-size:11px;color:var(--ok);font-weight:600}
@@ -1574,7 +1575,7 @@ function renderCuentas(){
   let h = `<div class="ct-head"><span class="sub">Total</span><b class="bal-big num">${fmt(tt.total)}</b><span class="sub num">Todas las cuentas: ${fmt(tt.todas)}</span></div>
     <div class="ct-acts"><button class="ct-act" data-act="trfhist"><span>🕘</span>Historial de transferencias</button><button class="ct-act" data-act="trfnew"><span>⇄</span>Nueva transferencia</button></div>`;
   if (S.trfEdit) h += trfForm(S.trfEdit);
-  if (S.ctaEdit) h += ctaForm(S.ctaEdit);
+  if (S.ctaEdit) h += ctaForm(S.ctaEdit) + (S.ctaEdit.nuevo ? "" : ctaLedgerHTML(S.ctaEdit));
   h += `<div class="ct-list">` + list.map((c,i)=>{ const v=ctaSaldo(c);
     return `<button class="ct-row" data-act="ctaedit" data-i="${i}"><span class="ct-ic" style="background:${ctaColor(c.n)}">${ctaIcon(c.n)}</span><span class="ct-n">${esc(c.n)}</span>${c.t?"":'<span class="ct-hid" title="No suma al total" aria-label="No suma al total">⊘</span>'}<span class="num ct-v${v<0?" neg":""}">${fmt(v)}</span></button>`; }).join("") + `</div>
     <div class="actions"><button class="btn sm" data-act="ctanew">+ Agregar cuenta</button></div>
@@ -1788,6 +1789,30 @@ function tddCtasHTML(c){
   const l = tddCtas(c); if (!l.length) return "";
   return `<div><div class="sec-head"><b>Cuentas</b><span class="sub num">${fmt(tddSaldo(c))} en total · se actualiza con Cuentas</span></div>
     <table class="num"><tbody>${l.filter(x=>Math.abs(ctaSaldo(x))>=0.005).map(x=>`<tr><td>${esc(x.n)}</td><td>${fmt(ctaSaldo(x))}</td></tr>`).join("")}</tbody></table>${l.some(x=>Math.abs(ctaSaldo(x))<0.005)?`<div class="sub">${l.filter(x=>Math.abs(ctaSaldo(x))<0.005).length} cuentas más en $0.00</div>`:""}</div>`;
+}
+
+/* ---- Historial por cuenta ---- */
+function ctaLedger(c){
+  const rows = [];
+  allMonths().forEach(ym=>{ if (ym < BASE_CTAS.slice(0,7)) return; monthItems(ym).forEach(x=>{ if (x.f>BASE_CTAS && x.cta===c.n && !x.tdc) rows.push({f:x.f, d:(x.n||x.cat)+(x.n?` · ${x.cat}`:""), m: x.t==="i" ? +x.m : -x.m, k:x.t==="i"?"Ingreso":"Gasto"}); }); });
+  S.periods.forEach(p=>(p.pagos||[]).forEach(g=>{ if (g.f>BASE_CTAS && g.cta===c.n) rows.push({f:g.f, d:"Pago "+cname(card(p.card)||{nombre:p.card})+` (vence ${dShort(p.due)})`, m:-(+g.m||0), k:"Pago TDC"}); }));
+  trfItems().forEach(x=>{ if (x.f>BASE_CTAS){ if (x.de===c.n) rows.push({f:x.f, d:"Transferencia a "+x.a, m:-x.m, k:"Transferencia"}); if (x.a===c.n) rows.push({f:x.f, d:"Transferencia de "+x.de, m:+x.m, k:"Transferencia"}); } });
+  rows.sort((a,b)=>a.f.localeCompare(b.f)); let s = +c.s||0; rows.forEach(r=>{ s = Math.round((s+r.m)*100)/100; r.s = s; });
+  return rows;
+}
+function ctaLedgerHTML(c){
+  const rows = ctaLedger(c), lim = (()=>{ const d=parseD(todayISO); d.setDate(d.getDate()-45); return iso(d); })();
+  const fuera = [];
+  allMonths().slice(-3).forEach(ym=>monthItems(ym).forEach(x=>{ if (x.cta===c.n && !x.tdc && x.f<=BASE_CTAS && x.f>=lim) fuera.push(x); }));
+  S.periods.forEach(p=>(p.pagos||[]).forEach(g=>{ if (g.cta===c.n && g.f<=BASE_CTAS && g.f>=lim) fuera.push({f:g.f, n:"Pago "+cname(card(p.card)||{nombre:p.card}), m:g.m}); }));
+  const sinPago = S.periods.filter(p=>p.status==="pagado" && !(p.pagos||[]).length && p.due>=lim);
+  let h = `<div class="panel led"><div class="sec-head"><b>Movimientos de ${esc(c.n)}</b><span class="sub">desde el ${dLong(BASE_CTAS)}</span></div>
+    <table class="xt num"><tbody><tr><td class="d">${dShort(BASE_CTAS)}</td><td>Saldo inicial</td><td class="n"></td><td class="n"><b>${fmt(+c.s||0)}</b></td></tr>
+    ${rows.map(r=>`<tr><td class="d">${dShort(r.f)}</td><td>${esc(r.d)} <span class="sub">· ${r.k}</span></td><td class="n" style="color:${r.m<0?"var(--bad)":"var(--ok)"}">${r.m<0?"−":"+"}${fmt(Math.abs(r.m))}</td><td class="n">${fmt(r.s)}</td></tr>`).join("")}
+    </tbody></table>${rows.length?"":'<p class="sub">Ningún movimiento ha tocado esta cuenta desde esa fecha.</p>'}`;
+  if (fuera.length) h += `<div class="tx-warn">⚠️ Estos movimientos usan esta cuenta pero tienen fecha del ${dLong(BASE_CTAS)} o antes, así que <b>no se descuentan</b> (se asume que ya estaban en el saldo inicial):<ul>${fuera.map(x=>`<li>${dShort(x.f)} · ${esc(x.n||x.cat)} · ${fmt(+x.m)}</li>`).join("")}</ul></div>`;
+  if (sinPago.length) h += `<div class="tx-warn">ℹ️ Estados de cuenta marcados como pagados <b>sin registrar de qué cuenta salió el dinero</b> (no descuentan de ninguna cuenta):<ul>${sinPago.map(p=>`<li>${esc(cname(card(p.card)||{nombre:p.card}))} · vence ${dShort(p.due)} · ${fmt(total(p))}</li>`).join("")}</ul>Ábrelos en la Wallet y usa 💸 Registrar pago.</div>`;
+  return h + `</div>`;
 }
 
 /* ================= Registro de transacción (como en tu app) ================= */
