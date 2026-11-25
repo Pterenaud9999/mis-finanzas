@@ -1346,6 +1346,15 @@ function catIcon(c,t){ const tt=t||S.mvT||"g", o=S.catCfg?.[tt]?.[c]; if (o) ret
 function icHTML(v, alt){ return v && /^ti-[a-z0-9-]+$/.test(v) ? `<i class="ti ${v}" aria-hidden="true"></i>` : esc(v || alt || ""); }
 
 function catColor(c,t){ const ic=catIcon(c,t); if (ic && ic[1]) return ic[1]; let h=0; for (const ch of String(c)) h=(h*31+ch.charCodeAt(0))>>>0; return CAT_COLORS[h%CAT_COLORS.length]; }
+function mvPickHTML(mode){
+  return mode==="periodo"
+      ? `<form class="f" data-form="mvper"><label class="chk full" for="mp-all"><input type="checkbox" id="mp-all" ${S.mvAll?"checked":""}> Todos (todo el historial)</label>
+         <label for="mp-from">Desde<input id="mp-from" type="date" value="${esc(S.mvFrom||todayISO.slice(0,4)+"-01-01")}"></label>
+         <label for="mp-to">Hasta<input id="mp-to" type="date" value="${esc(S.mvTo||todayISO)}"></label>
+         <div class="actions full"><button class="btn primary" type="submit">OK</button><button class="btn" type="button" data-act="mvpickclose">Cancelar</button></div></form>`
+      : `<form class="f" data-form="mvdate"><label class="full" for="md-d">Ir a la fecha<input id="md-d" type="date" value="${esc(S.mvDate||todayISO)}"></label>
+         <div class="actions full"><button class="btn primary" type="submit">OK</button><button class="btn" type="button" data-act="mvtoday">Hoy</button><button class="btn" type="button" data-act="mvpickclose">Cancelar</button></div></form>`;
+}
 function mvRange(){
   const mode = S.mvMode||"mes", d = parseD(S.mvDate||todayISO);
   if (mode==="dia"){ const s=iso(d); return {from:s,to:s,label:(s===todayISO?"Hoy, ":"")+`${d.getDate()} de ${MESL[d.getMonth()].toLowerCase()} (${DIAS[d.getDay()]})`}; }
@@ -1394,15 +1403,7 @@ function renderMovs(){
     <div class="mv-nav">${mode!=="periodo"?`<button class="btn sm" data-act="mvprev" aria-label="Anterior">‹</button>`:"<span></span>"}
       <button class="linkbtn mv-label" data-act="mvpick">${esc(r.label)}</button>
       ${mode!=="periodo"?`<button class="btn sm" data-act="mvnext" aria-label="Siguiente">›</button>`:"<span></span>"}</div>`;
-  if (S.mvPicking){
-    h += mode==="periodo"
-      ? `<form class="f" data-form="mvper"><label class="chk full" for="mp-all"><input type="checkbox" id="mp-all" ${S.mvAll?"checked":""}> Todos (todo el historial)</label>
-         <label for="mp-from">Desde<input id="mp-from" type="date" value="${esc(S.mvFrom||todayISO.slice(0,4)+"-01-01")}"></label>
-         <label for="mp-to">Hasta<input id="mp-to" type="date" value="${esc(S.mvTo||todayISO)}"></label>
-         <div class="actions full"><button class="btn primary" type="submit">OK</button><button class="btn" type="button" data-act="mvpickclose">Cancelar</button></div></form>`
-      : `<form class="f" data-form="mvdate"><label class="full" for="md-d">Ir a la fecha<input id="md-d" type="date" value="${esc(S.mvDate||todayISO)}"></label>
-         <div class="actions full"><button class="btn primary" type="submit">OK</button><button class="btn" type="button" data-act="mvtoday">Hoy</button><button class="btn" type="button" data-act="mvpickclose">Cancelar</button></div></form>`;
-  }
+  if (S.mvPicking && !S.trfView) h += mvPickHTML(mode);
   h += `<div class="mv-donut">${donut(cats.map(([c,o])=>[c,o.v]), totalV||1, totalV?null:emptyTxt)}<button class="fab" data-act="madd" aria-label="Agregar movimiento">+</button></div></div>`;
   if (S.movEdit && S.movEdit.nuevo) h += movForm(S.movEdit);
   h += `<div class="mv-list">` + cats.map(([c,o])=>{
@@ -1599,6 +1600,7 @@ function renderTrfHist(){
   let h = `<div class="sec-head"><button class="btn sm" data-act="trfback">← Cuentas</button><b>Transferencias</b><button class="btn sm primary" data-act="trfnew">+</button></div>
     <div class="mv-card"><div class="mv-modes">${[["dia","Día"],["semana","Semana"],["mes","Mes"],["ano","Año"],["periodo","Período"]].map(([v,l])=>`<button data-act="mvmode" data-v="${v}" aria-pressed="${mode===v}">${l}</button>`).join("")}</div>
     <div class="mv-nav">${mode!=="periodo"?`<button class="btn sm" data-act="mvprev" aria-label="Anterior">‹</button>`:"<span></span>"}<button class="linkbtn mv-label" data-act="mvpick">${esc(r.label)}</button>${mode!=="periodo"?`<button class="btn sm" data-act="mvnext" aria-label="Siguiente">›</button>`:"<span></span>"}</div></div>`;
+  if (S.mvPicking) h += mvPickHTML(mode);
   if (S.trfEdit) h += trfForm(S.trfEdit);
   h += Object.entries(byDay).map(([d,arr])=>`<div class="mday"><div class="mday-h"><span>${dLong(d)}</span></div>` + arr.map(x=>
     `<button class="tr-row" data-act="trfedit" data-id="${esc(x.id)}" data-f="${esc(x.f)}"><span class="tr-arrow">↓</span><span><span>${esc(x.de)}</span><br><span class="sub">${esc(x.a)}</span>${x.n?`<br><span class="sub">${esc(x.n)}</span>`:""}</span><span class="num">${fmt(x.m)}</span></button>`).join("") + `</div>`).join("")
@@ -1706,8 +1708,8 @@ document.addEventListener("click", async e=>{
     case "drawer": openDrawer(true); return;
     case "drawerclose": openDrawer(false); return;
     case "theme": { const t = {light:"verde", verde:"dark", dark:"light"}[S.theme] || "verde"; S.theme=t; applyTheme(t); try{ localStorage.setItem("mf-theme",t); }catch(err){} return; }
-    case "trfhist": S.trfView=true; S.trfEdit=null; renderCuentas(); return;
-    case "trfback": S.trfView=false; S.trfEdit=null; renderCuentas(); return;
+    case "trfhist": S.trfView=true; S.trfEdit=null; S.mvPicking=false; renderCuentas(); return;
+    case "trfback": S.trfView=false; S.trfEdit=null; S.mvPicking=false; renderCuentas(); return;
     case "trfnew": S.trfConfirm=false; S.trfEdit={nuevo:true,f:todayISO}; renderCuentas(); $("tr-de")?.focus(); return;
     case "trfedit": { S.trfConfirm=false; const x = trfMonth(a.dataset.f.slice(0,7)).find(y=>y.id===a.dataset.id); S.trfEdit={...x}; renderCuentas(); return; }
     case "trfcancel": S.trfEdit=null; renderCuentas(); return;
@@ -1828,6 +1830,9 @@ document.addEventListener("change", async e=>{
   const l = S.ctas.list.map(x=>({...x})); l[+t.dataset.ctaen].en = t.value; S.ctas = {...S.ctas, list:l}; renderCuentas();
   if (db) await save(()=>db.doc("config/cuentas").set({...S.ctas, list:l}));
 });
+
+/* El historial de transferencias comparte la navegación de fechas con Inicio: refrescarlo también */
+{ const rm = renderMovs; renderMovs = function(){ rm(); if (S.trfView && $("cuentas")) renderTrfHist(); }; }
 
 /* ================= Registro de transacción (como en tu app) ================= */
 const TK_BASE = [["fv","Frutas y verduras","#2fbf4f"],["prot","Proteína","#c0392b"],["lac","Lácteos","#4d8cf0"],["aba","Abarrotes y granos","#b07d2b"],["beb","Bebidas","#2bb5c4"],["snk","Snacks, dulces y pan","#e67e22"],["limp","Limpieza","#16a085"],["hog","Hogar","#7f8c8d"],["hig","Higiene personal","#9b59b6"],["otro","Otro","#9aa1ad"]];

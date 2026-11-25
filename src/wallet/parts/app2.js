@@ -95,6 +95,7 @@ function renderTrfHist(){
   let h = `<div class="sec-head"><button class="btn sm" data-act="trfback">← Cuentas</button><b>Transferencias</b><button class="btn sm primary" data-act="trfnew">+</button></div>
     <div class="mv-card"><div class="mv-modes">${[["dia","Día"],["semana","Semana"],["mes","Mes"],["ano","Año"],["periodo","Período"]].map(([v,l])=>`<button data-act="mvmode" data-v="${v}" aria-pressed="${mode===v}">${l}</button>`).join("")}</div>
     <div class="mv-nav">${mode!=="periodo"?`<button class="btn sm" data-act="mvprev" aria-label="Anterior">‹</button>`:"<span></span>"}<button class="linkbtn mv-label" data-act="mvpick">${esc(r.label)}</button>${mode!=="periodo"?`<button class="btn sm" data-act="mvnext" aria-label="Siguiente">›</button>`:"<span></span>"}</div></div>`;
+  if (S.mvPicking) h += mvPickHTML(mode);
   if (S.trfEdit) h += trfForm(S.trfEdit);
   h += Object.entries(byDay).map(([d,arr])=>`<div class="mday"><div class="mday-h"><span>${dLong(d)}</span></div>` + arr.map(x=>
     `<button class="tr-row" data-act="trfedit" data-id="${esc(x.id)}" data-f="${esc(x.f)}"><span class="tr-arrow">↓</span><span><span>${esc(x.de)}</span><br><span class="sub">${esc(x.a)}</span>${x.n?`<br><span class="sub">${esc(x.n)}</span>`:""}</span><span class="num">${fmt(x.m)}</span></button>`).join("") + `</div>`).join("")
@@ -202,8 +203,8 @@ document.addEventListener("click", async e=>{
     case "drawer": openDrawer(true); return;
     case "drawerclose": openDrawer(false); return;
     case "theme": { const t = {light:"verde", verde:"dark", dark:"light"}[S.theme] || "verde"; S.theme=t; applyTheme(t); try{ localStorage.setItem("mf-theme",t); }catch(err){} return; }
-    case "trfhist": S.trfView=true; S.trfEdit=null; renderCuentas(); return;
-    case "trfback": S.trfView=false; S.trfEdit=null; renderCuentas(); return;
+    case "trfhist": S.trfView=true; S.trfEdit=null; S.mvPicking=false; renderCuentas(); return;
+    case "trfback": S.trfView=false; S.trfEdit=null; S.mvPicking=false; renderCuentas(); return;
     case "trfnew": S.trfConfirm=false; S.trfEdit={nuevo:true,f:todayISO}; renderCuentas(); $("tr-de")?.focus(); return;
     case "trfedit": { S.trfConfirm=false; const x = trfMonth(a.dataset.f.slice(0,7)).find(y=>y.id===a.dataset.id); S.trfEdit={...x}; renderCuentas(); return; }
     case "trfcancel": S.trfEdit=null; renderCuentas(); return;
@@ -324,3 +325,6 @@ document.addEventListener("change", async e=>{
   const l = S.ctas.list.map(x=>({...x})); l[+t.dataset.ctaen].en = t.value; S.ctas = {...S.ctas, list:l}; renderCuentas();
   if (db) await save(()=>db.doc("config/cuentas").set({...S.ctas, list:l}));
 });
+
+/* El historial de transferencias comparte la navegación de fechas con Inicio: refrescarlo también */
+{ const rm = renderMovs; renderMovs = function(){ rm(); if (S.trfView && $("cuentas")) renderTrfHist(); }; }

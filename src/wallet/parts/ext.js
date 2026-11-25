@@ -205,6 +205,15 @@ function catIcon(c,t){ const tt=t||S.mvT||"g", o=S.catCfg?.[tt]?.[c]; if (o) ret
 function icHTML(v, alt){ return v && /^ti-[a-z0-9-]+$/.test(v) ? `<i class="ti ${v}" aria-hidden="true"></i>` : esc(v || alt || ""); }
 
 function catColor(c,t){ const ic=catIcon(c,t); if (ic && ic[1]) return ic[1]; let h=0; for (const ch of String(c)) h=(h*31+ch.charCodeAt(0))>>>0; return CAT_COLORS[h%CAT_COLORS.length]; }
+function mvPickHTML(mode){
+  return mode==="periodo"
+      ? `<form class="f" data-form="mvper"><label class="chk full" for="mp-all"><input type="checkbox" id="mp-all" ${S.mvAll?"checked":""}> Todos (todo el historial)</label>
+         <label for="mp-from">Desde<input id="mp-from" type="date" value="${esc(S.mvFrom||todayISO.slice(0,4)+"-01-01")}"></label>
+         <label for="mp-to">Hasta<input id="mp-to" type="date" value="${esc(S.mvTo||todayISO)}"></label>
+         <div class="actions full"><button class="btn primary" type="submit">OK</button><button class="btn" type="button" data-act="mvpickclose">Cancelar</button></div></form>`
+      : `<form class="f" data-form="mvdate"><label class="full" for="md-d">Ir a la fecha<input id="md-d" type="date" value="${esc(S.mvDate||todayISO)}"></label>
+         <div class="actions full"><button class="btn primary" type="submit">OK</button><button class="btn" type="button" data-act="mvtoday">Hoy</button><button class="btn" type="button" data-act="mvpickclose">Cancelar</button></div></form>`;
+}
 function mvRange(){
   const mode = S.mvMode||"mes", d = parseD(S.mvDate||todayISO);
   if (mode==="dia"){ const s=iso(d); return {from:s,to:s,label:(s===todayISO?"Hoy, ":"")+`${d.getDate()} de ${MESL[d.getMonth()].toLowerCase()} (${DIAS[d.getDay()]})`}; }
@@ -253,15 +262,7 @@ function renderMovs(){
     <div class="mv-nav">${mode!=="periodo"?`<button class="btn sm" data-act="mvprev" aria-label="Anterior">‹</button>`:"<span></span>"}
       <button class="linkbtn mv-label" data-act="mvpick">${esc(r.label)}</button>
       ${mode!=="periodo"?`<button class="btn sm" data-act="mvnext" aria-label="Siguiente">›</button>`:"<span></span>"}</div>`;
-  if (S.mvPicking){
-    h += mode==="periodo"
-      ? `<form class="f" data-form="mvper"><label class="chk full" for="mp-all"><input type="checkbox" id="mp-all" ${S.mvAll?"checked":""}> Todos (todo el historial)</label>
-         <label for="mp-from">Desde<input id="mp-from" type="date" value="${esc(S.mvFrom||todayISO.slice(0,4)+"-01-01")}"></label>
-         <label for="mp-to">Hasta<input id="mp-to" type="date" value="${esc(S.mvTo||todayISO)}"></label>
-         <div class="actions full"><button class="btn primary" type="submit">OK</button><button class="btn" type="button" data-act="mvpickclose">Cancelar</button></div></form>`
-      : `<form class="f" data-form="mvdate"><label class="full" for="md-d">Ir a la fecha<input id="md-d" type="date" value="${esc(S.mvDate||todayISO)}"></label>
-         <div class="actions full"><button class="btn primary" type="submit">OK</button><button class="btn" type="button" data-act="mvtoday">Hoy</button><button class="btn" type="button" data-act="mvpickclose">Cancelar</button></div></form>`;
-  }
+  if (S.mvPicking && !S.trfView) h += mvPickHTML(mode);
   h += `<div class="mv-donut">${donut(cats.map(([c,o])=>[c,o.v]), totalV||1, totalV?null:emptyTxt)}<button class="fab" data-act="madd" aria-label="Agregar movimiento">+</button></div></div>`;
   if (S.movEdit && S.movEdit.nuevo) h += movForm(S.movEdit);
   h += `<div class="mv-list">` + cats.map(([c,o])=>{
