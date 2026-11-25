@@ -33,7 +33,7 @@ function ctaTipo(c){
 }
 function balanceCalc(){
   const tdd = S.cards.filter(c=>c.tipo==="TDD");
-  const ctl = (S.ctas?.list)||[], useCards = !ctl.length, esEf = c=>/efectivo/i.test(c.n||"");
+  const ctl = (S.ctas?.list)||[], useCards = !ctl.length, esEf = c=>ctaEn(c)==="efectivo";
   let cash = useCards || !ctl.some(esEf) ? (S.cash?.items||[]).reduce((a,x)=>a+(+x.saldo||0),0) : 0;
   let digital=0, emerg=0, salud=0, otros=0, vales=0, pagarAp=0;
   if (!useCards) ctl.forEach(c=>{ const t = ctaTipo(c); if (t==="fuera") return; const v = ctaSaldo(c);

@@ -57,8 +57,16 @@ function renderCuentas(){
     <div class="ct-acts"><button class="ct-act" data-act="trfhist"><span>🕘</span>Historial de transferencias</button><button class="ct-act" data-act="trfnew"><span>⇄</span>Nueva transferencia</button></div>`;
   if (S.trfEdit) h += trfForm(S.trfEdit);
   if (S.ctaEdit) h += ctaForm(S.ctaEdit) + (S.ctaEdit.nuevo ? "" : ctaLedgerHTML(S.ctaEdit));
+  h += `<div class="actions"><button class="btn sm${S.ctaUbi?" primary":""}" data-act="ctaubi">📍 ${S.ctaUbi?"Listo":"Ubicar cuentas"}</button></div>`;
+  if (S.ctaUbi){
+    const grupos = [...tddCards().map(c=>c.id), "efectivo", ""];
+    h += `<p class="sub" style="margin:0">Elige en qué tarjeta de débito real o en efectivo está cada cuenta. Cada grupo debe coincidir con el saldo de esa tarjeta en tu banco.</p>` + grupos.map(g=>{ const its = list.map((c,i)=>({c,i})).filter(o=>ctaEn(o.c)===g); if (!its.length && g==="") return "";
+      const tot = its.reduce((a,o)=>a+ctaSaldo(o.c),0);
+      return `<div class="ubi-g"><div class="sec-head"><b>${g==="efectivo"?"💵 ":g?"💳 ":"❔ "}${esc(ctaEnName(g))}</b><b class="num">${fmt(tot)}</b></div>${its.map(o=>`<div class="ubi-r"><span>${esc(o.c.n)}</span><span class="num">${fmt(ctaSaldo(o.c))}</span><select data-ctaen="${o.i}" aria-label="Dónde está ${esc(o.c.n)}">${ctaEnOpts(g)}</select></div>`).join("") || '<p class="sub" style="margin:4px 0">Sin cuentas.</p>'}</div>`; }).join("");
+    box.innerHTML = h; return;
+  }
   h += `<div class="ct-list">` + list.map((c,i)=>{ const v=ctaSaldo(c);
-    return `<button class="ct-row" data-act="ctaedit" data-i="${i}"><span class="ct-ic" style="background:${ctaColor(c.n)}">${ctaIcon(c.n)}</span><span class="ct-n">${esc(c.n)}</span>${c.t?"":'<span class="ct-hid" title="No suma al total" aria-label="No suma al total">⊘</span>'}<span class="num ct-v${v<0?" neg":""}">${fmt(v)}</span></button>`; }).join("") + `</div>
+    return `<button class="ct-row" data-act="ctaedit" data-i="${i}"><span class="ct-ic" style="background:${ctaColor(c.n)}">${ctaIcon(c.n)}</span><span class="ct-n">${esc(c.n)}<small class="ct-en">${esc(ctaEnName(ctaEn(c)))}</small></span>${c.t?"":'<span class="ct-hid" title="No suma al total" aria-label="No suma al total">⊘</span>'}<span class="num ct-v${v<0?" neg":""}">${fmt(v)}</span></button>`; }).join("") + `</div>
     <div class="actions"><button class="btn sm" data-act="ctanew">+ Agregar cuenta</button></div>
     <p class="sub" style="margin:0">⊘ = no suma al total (igual que el ojo tachado de tu app). Saldos al ${dLong(BASE_CTAS)}; desde ahí se actualizan con tus movimientos y transferencias.</p>`;
   box.innerHTML = h;
@@ -66,6 +74,7 @@ function renderCuentas(){
 function ctaForm(x){
   return `<form class="f mform" data-form="cta"><label class="full" for="ct-n">Nombre<input id="ct-n" required maxlength="60" value="${esc(x.n||"")}"></label>
     <label for="ct-s">Saldo actual<input id="ct-s" type="number" step="0.01" value="${x.nuevo?"":ctaSaldo(x)}"></label>
+    <label class="full" for="ct-en">¿Dónde está el dinero?<select id="ct-en">${ctaEnOpts(x.nuevo?"":ctaEn(x))}</select></label>
     <label class="chk" for="ct-t" style="align-self:end"><input type="checkbox" id="ct-t" ${x.t?"checked":""}> Suma al total</label>
     <div class="actions full"><button class="btn primary" type="submit">Guardar</button><button class="btn" type="button" data-act="ctacancel">Cancelar</button>${x.nuevo?"":`<button class="btn sm" type="button" data-act="ctaup">↑</button><button class="btn sm" type="button" data-act="ctadown">↓</button><button class="btn danger" type="button" data-act="ctadel">${S.ctaConfirm?"Confirmar eliminar":"Eliminar"}</button>`}</div></form>`;
 }
@@ -185,7 +194,7 @@ document.addEventListener("click", async e=>{
   const nav = e.target.closest("[data-nav]"); if (nav && !$("drawer").hidden) openDrawer(false);
   const a = e.target.closest("[data-act]"); if (!a) return;
   const act = a.dataset.act;
-  const mine = ["drawer","drawerclose","theme","trfhist","trfback","trfnew","trfedit","trfcancel","trfdel","ctaedit","ctanew","ctacancel","ctadel","ctaup","ctadown","grt","grp","grsel","ctt","catedit","catnew","catcancel","catico","catcol"];
+  const mine = ["drawer","drawerclose","theme","trfhist","trfback","trfnew","trfedit","trfcancel","trfdel","ctaedit","ctaubi","ctanew","ctacancel","ctadel","ctaup","ctadown","grt","grp","grsel","ctt","catedit","catnew","catcancel","catico","catcol"];
   if (!mine.includes(act)) return;
   e.stopImmediatePropagation();
   const i = a.dataset.i!=null ? +a.dataset.i : null;
@@ -201,6 +210,7 @@ document.addEventListener("click", async e=>{
     case "trfdel": { if (!S.trfConfirm){ S.trfConfirm=true; renderCuentas(); return; }
       const x=S.trfEdit, ym=x.f.slice(0,7); if (db) await save(async()=>{ await toTrash({tipo:"trf", ym, data:{...x}}); await writeTrfMonth(ym, trfMonth(ym).filter(y=>y.id!==x.id)); });
       S.trfEdit=null; S.trfConfirm=false; return; }
+    case "ctaubi": S.ctaUbi=!S.ctaUbi; S.ctaEdit=null; renderCuentas(); return;
     case "ctaedit": S.ctaConfirm=false; S.ctaEdit={...S.ctas.list[i], i}; renderCuentas(); return;
     case "ctanew": S.ctaEdit={nuevo:true,n:"",s:0,t:false}; renderCuentas(); return;
     case "ctacancel": S.ctaEdit=null; renderCuentas(); return;
@@ -236,8 +246,9 @@ document.addEventListener("submit", async e=>{
   if (k==="cta"){
     const x=S.ctaEdit, l=((S.ctas?.list)||[]).map(y=>({...y}));
     const n=$("ct-n").value.trim(), deseado=parseFloat($("ct-s").value||"0"), t=$("ct-t").checked; if (!n) return;
-    if (x.nuevo) l.push({n, s:deseado||0, t});
-    else { const old=l[x.i]; const actual=ctaSaldo(old); l[x.i]={...old, n, t, s:Math.round(((+old.s||0)+(deseado-actual))*100)/100}; }
+    const en=$("ct-en")?$("ct-en").value:undefined;
+    if (x.nuevo) l.push({n, s:deseado||0, t, ...(en!=null?{en}:{})});
+    else { const old=l[x.i]; const actual=ctaSaldo(old); l[x.i]={...old, n, t, s:Math.round(((+old.s||0)+(deseado-actual))*100)/100}; if (en!=null) l[x.i].en=en; }
     await save(()=>db.doc("config/cuentas").set({...(S.ctas||{}), list:l})); S.ctaEdit=null; renderCuentas(); return;
   }
   if (k==="cat"){
@@ -251,20 +262,32 @@ document.addEventListener("submit", async e=>{
 
 /* ---- Tarjetas de débito ligadas a Cuentas ---- */
 function tddNorm(t){ return String(t||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,""); }
+function tddAuto(c, x){
+  const nm = tddNorm(cname(c)+" "+(c.banco||"")), n = tddNorm(x.n);
+  if (/mercado ?pago|\bmp\b/.test(nm)) return /^mp\b|mercado ?pago/.test(n);
+  if (/open ?bank/.test(nm)) return /^open ?bank|^open\b/.test(n);
+  const w = (nm.match(/[a-z]{3,}/g)||[]).filter(t=>!["tarjeta","debito","cuenta","nomina","card"].includes(t))[0];
+  return !!w && new RegExp("\\b"+w+"\\b").test(n) && !/deuda/.test(n);
+}
+function tddCards(){ return S.cards.filter(c=>c.tipo!=="TDC").sort((a,b)=>(a.orden||0)-(b.orden||0)); }
+function ctaEn(x){
+  if (x.en!=null) return x.en;
+  if (/efectivo/i.test(x.n||"")) return "efectivo";
+  const cs = tddCards();
+  const ex = cs.find(c=>Array.isArray(c.ctas) && c.ctas.includes(x.n)); if (ex) return ex.id;
+  const au = cs.find(c=>!Array.isArray(c.ctas) && tddAuto(c, x)); return au ? au.id : "";
+}
+function ctaEnName(en){ if (en==="efectivo") return "Efectivo"; const c = en && card(en); return c ? cname(c) : "Sin asignar"; }
+function ctaEnOpts(sel){ return `<option value=""${!sel?" selected":""}>Sin asignar</option><option value="efectivo"${sel==="efectivo"?" selected":""}>💵 Efectivo</option>${tddCards().map(c=>`<option value="${esc(c.id)}"${sel===c.id?" selected":""}>💳 ${esc(cname(c))}</option>`).join("")}`; }
 function tddCtas(c){
   const list = (S.ctas?.list)||[]; if (!list.length || c.tipo==="TDC") return [];
-  if (Array.isArray(c.ctas)) return list.filter(x=>c.ctas.includes(x.n));
-  const nm = tddNorm(cname(c)+" "+(c.banco||""));
-  if (/mercado ?pago|\bmp\b/.test(nm)) return list.filter(x=>/^mp\b|mercado ?pago/.test(tddNorm(x.n)));
-  if (/open ?bank/.test(nm)) return list.filter(x=>/^open ?bank|^open\b/.test(tddNorm(x.n)));
-  const w = (nm.match(/[a-z]{3,}/g)||[]).filter(t=>!["tarjeta","debito","cuenta","nomina","card"].includes(t))[0];
-  return w ? list.filter(x=>{ const n = tddNorm(x.n); return new RegExp("\\b"+w+"\\b").test(n) && !/deuda/.test(n); }) : [];
+  return list.filter(x=>ctaEn(x)===c.id);
 }
 function tddSaldo(c){ const l = tddCtas(c); return l.length ? Math.round(l.reduce((a,x)=>a+ctaSaldo(x),0)*100)/100 : (c.saldo!=null ? +c.saldo : null); }
 function tddLinkHTML(c){
-  const list = (S.ctas?.list)||[]; if (!list.length) return "";
-  const on = new Set(tddCtas(c).map(x=>x.n));
-  return `<div class="full"><div class="sub">Cuentas que forman esta tarjeta (su saldo se calcula solo desde Cuentas)</div><div class="tdd-ctas">${list.map((x,i)=>`<label class="chk" for="e-tc-${i}"><input type="checkbox" id="e-tc-${i}" data-tddcta="${esc(x.n)}" ${on.has(x.n)?"checked":""}> ${esc(x.n)} <span class="sub num">${fmt(ctaSaldo(x))}</span></label>`).join("")}</div></div>`;
+  if (!((S.ctas?.list)||[]).length) return "";
+  const l = tddCtas(c);
+  return `<div class="full sub">El saldo de esta tarjeta es la suma de las cuentas que le asignes en <b>Cuentas → 📍 Ubicar cuentas</b>${l.length?` (ahora: ${l.length} cuenta${l.length>1?"s":""}, ${fmt(tddSaldo(c))})`:""}.</div>`;
 }
 function tddCtasHTML(c){
   const l = tddCtas(c); if (!l.length) return "";
@@ -295,3 +318,9 @@ function ctaLedgerHTML(c){
   if (sinPago.length) h += `<div class="tx-warn">ℹ️ Estados de cuenta marcados como pagados <b>sin registrar de qué cuenta salió el dinero</b> (no descuentan de ninguna cuenta):<ul>${sinPago.map(p=>`<li>${esc(cname(card(p.card)||{nombre:p.card}))} · vence ${dShort(p.due)} · ${fmt(total(p))}</li>`).join("")}</ul>Ábrelos en la Wallet y usa 💸 Registrar pago.</div>`;
   return h + `</div>`;
 }
+
+document.addEventListener("change", async e=>{
+  const t = e.target.closest?.("[data-ctaen]"); if (!t || !S.ctas) return;
+  const l = S.ctas.list.map(x=>({...x})); l[+t.dataset.ctaen].en = t.value; S.ctas = {...S.ctas, list:l}; renderCuentas();
+  if (db) await save(()=>db.doc("config/cuentas").set({...S.ctas, list:l}));
+});
